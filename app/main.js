@@ -147,7 +147,7 @@
       var weight = clamp(Math.pow(0.45 / m.fill, 0.3), 0.84, 1.25);
       var k = Math.min(w / m.w, h / m.h, size * weight / Math.sqrt(m.w * m.h)), s = m.n * k;
       st = 'width:' + px(s) + ';height:' + px(s) + ';left:' + px(w / 2 - (m.x + m.w / 2) * k) + ';top:' + px(h / 2 - (m.y + m.h / 2) * k);
-    } else st = 'width:' + w + 'px;height:' + h + 'px;left:0;top:0;object-fit:contain';
+    } else st = 'width:' + w + 'px;height:' + h + 'px;left:0;top:0;object-fit:contain;-webkit-mask-size:contain;mask-size:contain;-webkit-mask-position:center;mask-position:center';
     probeMark(id);
     return '<span class="mark' + (markProbes[id] === 'bad' ? ' is-bad' : '') + '" data-mark="' + id + '" style="width:' + w + 'px;height:' + h + 'px">'
       + (maskSupport ? '<span class="mk" style="' + st + ';-webkit-mask-image:url(' + ICONS + id + '.svg);mask-image:url(' + ICONS + id + '.svg)"></span>' : '<img alt="" src="' + ICONS + id + '.svg" style="' + st + '">') + '</span>';
