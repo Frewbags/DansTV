@@ -16,9 +16,8 @@ This first milestone only prepares, signs, installs and launches a separately id
 ## 1. Preview and static checks (offline from TV)
 
     npm ci
-    npm run check
-    npm run check:offline
-    npm run dev:public
+    npm run win:check
+    npm run win:preview
 
 Visit http://127.0.0.1:4795/home/. This is a desktop preview, not a TV compatibility test.
 
