@@ -15,7 +15,7 @@ EXPECTED_NAME = "T-NKMUABC.zip"
 MAX_PRINT = 80
 
 
-def check(path: Path, calc_hash: bool) -> int:
+def check(path: Path, calc_hash: bool, check_contents: bool) -> int:
     if not path.is_file():
         raise ValueError(f"Firmware ZIP not found: {path}")
     if path.name.upper() != EXPECTED_NAME.upper():
@@ -33,7 +33,7 @@ def check(path: Path, calc_hash: bool) -> int:
         print(f"SHA-256: {digest.hexdigest()}")
     try:
         with zipfile.ZipFile(path) as archive:
-            if archive.testzip() is not None:
+            if check_contents and archive.testzip() is not None:
                 raise ValueError("ZIP contains a damaged member")
             members = archive.infolist()
             if not members:
@@ -56,9 +56,10 @@ def main() -> int:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("zip", type=Path, help="Official T-NKMUABC.zip already downloaded to this PC")
     parser.add_argument("--sha256", action="store_true", help="Compute full local file digest")
+    parser.add_argument("--check-contents", action="store_true", help="Decompress and CRC-check every member (slow for large ZIPs)")
     args = parser.parse_args()
     try:
-        return check(args.zip, args.sha256)
+        return check(args.zip, args.sha256, args.check_contents)
     except (ValueError, OSError) as exc:
         parser.exit(2, f"{exc}\n")
 
