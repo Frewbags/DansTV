@@ -21,6 +21,23 @@
     'd0m1lV1nt2.emanual', '2022ePop01.SmartTV',
     'ZODRT12q2l.WebAccountExtension', 'ByJlgt0XeD.CastSettingsApp', 'tv6pbVMQFF.PrivacyChoices'];
   var SELF = 'nClrkHome1.FrameHome';
+  var NAMED = {
+    jellyfin: { ids: [], names: [/^jellyfin$/i] },
+    kayo: { ids: ['eYuOiOLYQX.KayoSports'], names: [/^kayo(?: sports)?$/i] },
+    '7plus': { ids: ['icp4AvUPiA.7plus'], names: [/^7plus$/i] },
+    '9now': { ids: ['Ne2ZsPWdKl.9NOW'], names: [/^9now$/i] },
+    '10play': { ids: ['KaLitts8bq.tenplaySamsungTizen'], names: [/^(?:10|10 play|10play|10 all access)$/i] }
+  };
+  function namedBrand(a) {
+    if (!a || !a.name || !a.id) return '';
+    var keys = Object.keys(NAMED);
+    for (var i = 0; i < keys.length; i++) {
+      var def = NAMED[keys[i]], j;
+      if (def.ids.indexOf(a.id) >= 0) return keys[i];
+      for (j = 0; j < def.names.length; j++) if (a.show && def.names[j].test(a.name)) return keys[i];
+    }
+    return '';
+  }
   function api() { return window.tizen && window.tizen.application; }
   function selfId() {
     try { return api().getCurrentApplication().appInfo.id || SELF; }
@@ -102,6 +119,28 @@
     try { api().launch(id, function () { finish(null); }, function (err) { finish(failure(err)); }); }
     catch (err) { finish(failure(err)); }
   }
+  function liveTV(done) { launchApp('org.tizen.tv-viewer', done); }
+  function launchNamed(brand, done) {
+    var def = NAMED[brand], application = api();
+    if (!def || !application || typeof application.getAppsInfo !== 'function') { unavailable(done); return; }
+    var finish = bounded(done, 20000);
+    try {
+      application.getAppsInfo(function (installed) {
+        var matches = [], seen = {}, i, item;
+        for (i = 0; i < installed.length; i++) {
+          item = installed[i];
+          if (namedBrand(item) !== brand || seen[item.id]) continue;
+          seen[item.id] = true;
+          matches.push(item);
+        }
+        if (matches.length !== 1) {
+          finish({ message: matches.length ? 'Multiple matching applications were found. Check the installed TV apps.' : brand + ' is not installed or cannot be discovered on this TV.' });
+          return;
+        }
+        launchApp(matches[0].id, function (err) { finish(err || null); });
+      }, function (err) { finish(failure(err)); });
+    } catch (err) { finish(failure(err)); }
+  }
   function launch(brand, done) {
     if (!IDS[brand]) { done({message: 'This app has no launch target.'}); return; }
     launchApp(IDS[brand], done);
@@ -126,18 +165,18 @@
         var known = {}, seen = {}, result = [], self = selfId();
         Object.keys(IDS).forEach(function (brand) { known[IDS[brand]] = brand; });
         list.forEach(function (a) {
-          var primary = !!known[a.id], stream = STREAMING.indexOf(a.id) >= 0;
+          var special = namedBrand(a), primary = !!known[a.id] || !!special, stream = STREAMING.indexOf(a.id) >= 0;
           var consumer = /^[A-Za-z0-9]{10}\.[A-Za-z0-9_-]+$/.test(a.id) || CONSUMER_SYSTEM.indexOf(a.id) >= 0;
           if (a.id === self || INTERNAL.indexOf(a.id) >= 0 || seen[a.id] || !a.name || (!primary && !stream && (!a.show || !consumer))) return;
           if (!primary && /(?:service|worker|preview|promotion|plugin|launcher|test|sdk|^ep[ -]|factory|daemon)/i.test(a.name + ' ' + a.id)) return;
           if (/-dummy$/.test(a.id) || a.id === 'com.samsung.tv.cobalt-yt') return;
           seen[a.id] = true;
-          result.push({ appId: a.id, name: a.name, brand: known[a.id] || EXTRA_BRANDS[a.id] || '', icon: a.iconPath || '', rank: primary ? Object.keys(IDS).indexOf(known[a.id]) : (stream ? 20 : 30) });
+          result.push({ appId: a.id, name: a.name, brand: special || known[a.id] || EXTRA_BRANDS[a.id] || '', icon: a.iconPath || '', rank: primary ? Object.keys(IDS).indexOf(known[a.id]) : (stream ? 20 : 30) });
         });
         result.sort(function (a, b) { return a.rank - b.rank || a.name.toLowerCase().localeCompare(b.name.toLowerCase()); });
         finish(null, result);
       }, function (err) { finish(failure(err)); });
     } catch (err) { finish(failure(err)); }
   }
-  window.FrameDevice = { launch: launch, launchApp: launchApp, art: art, home: home, settings: settings, apps: apps, sources: sources, setSource: setSource, cancelSource: cancelSource };
+  window.FrameDevice = { launch: launch, launchApp: launchApp, launchNamed: launchNamed, liveTV: liveTV, art: art, home: home, settings: settings, apps: apps, sources: sources, setSource: setSource, cancelSource: cancelSource };
 }());
