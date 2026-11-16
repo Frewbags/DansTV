@@ -20,6 +20,58 @@ Tiz0wn is MIT-licensed (Copyright © 2026 Sebastian J. Spicker); see upstream
 `LICENSE` and `NOTICE.md`. This code is adapted, not an assertion that its
 Q60T firmware offsets apply to a Q80T.
 
+## Hardware milestone — 16 November 2026
+
+The owner tested the Australian QA65Q80TAWXXY with
+**T-NKMUABC-2743.0** and reported the following from the bounded
+Remote PC → Shared Folder callback:
+
+```text
+Listening on 192.168.50.215:8181 for one TV callback.
+UID0-PROOF: Q80T command substitution executed with effective UID 0.
+```
+
+The host also observed an authenticated SMB session from the TV and the
+TV displayed a JPG from its temporary Windows SMB share. This establishes
+**one tested instance of effective-UID-0 command execution**, but not a
+general-purpose root shell, privilege persistence, Home redirection, or
+any firmware modification. No raw partition write has been performed on
+this Q80T.
+
+The owner should run `uid-probe.ps1 -Action Restore` if its
+`Prepare` state is still active. That restores the dedicated temporary
+lab account passwords; it does not delete the lab, which remains
+available for controlled testing. Do not commit any credential files.
+
+A bounded **read-only snapshot receiver prototype** was added as
+`root-bridge.py`. It is not yet wired to an end-to-end Windows launcher,
+and it has **not** been executed on the TV. Do not imply that it has
+established a working general root command channel.
+
+### Remaining acceptance gates
+
+1. A repeatable, authenticated root command channel must return
+   reproducible output from the actual Q80T without requiring firmware
+   modification, and have a verified stop/revoke path.
+2. Capture the Home-key table, `db/first_screen/type`, current package
+   state, startup services, and read-only platform/partition metadata.
+3. Export and verify an **off-TV** copy of the original Home database
+   before a reversible Home-button trial. Test Home, Back, Live TV,
+   HDMI, standby and reopening apps, with a tested restore procedure.
+4. Debloat only measured and identified services using reversible,
+   model-verified disablement, preserving tuner, DRM, connectivity,
+   upgrades and app lifecycle until checked.
+5. Before a persistent boot hook: obtain the **exact** official
+   T-NKMUABC-2743.0 image and matching live-build stamp; compute
+   per-image offsets and pre/post hashes, retain the original bytes
+   off-TV, and establish a credible hardware recovery path.
+   **Never apply Q60T/Q70T/Q74T/Q90T offsets to this set.**
+
+Outcome target: DansTV opens with Home, reliably survives a full
+cold boot, Samsung essentials remain operational, debloating is
+reversible and ordinary operation needs neither a PC nor a USB drive.
+None of these target outcomes is asserted as installed today.
+
 ## Current implementation
 
 | Component | Status | Source |
