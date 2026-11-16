@@ -44,7 +44,7 @@ function Check-Existing {
     if (Get-NetFirewallRule -Name $fwRDP -ErrorAction SilentlyContinue) { throw 'Temporary RDP firewall rule already exists.' }
 }
 function Host-IP([string]$tvIP) {
-    $client = New-Object System.Net.Sockets.UdpClient([Net.Sockets.AddressFamily]::InterNetwork)
+    $client = [System.Net.Sockets.UdpClient]::new([System.Net.Sockets.AddressFamily]::InterNetwork)
     try {
         # Connect chooses the local interface to reach the TV; no UDP packet is sent.
         $client.Connect($tvIP, 26101)
