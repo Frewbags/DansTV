@@ -530,8 +530,9 @@ try {
     check('Unassigning a shortcut is saved', (await stored()).consolePorts.switch === null);
     await closePage();
     await page({ seed: baseline({ consolePorts: { switch: '2', switch2: -2, ps4: 99 } }) });
-    check('Malformed HDMI assignments are rejected', ['switch','switch2','ps4'].every(id =>
-      !ShoreQA.state().consolePorts[id]));
+    const sanitized = await state();
+    check('Malformed HDMI assignments are rejected', ['switch', 'switch2', 'ps4'].every(id =>
+      sanitized.consolePorts[id] === null), sanitized.consolePorts);
   });
   await run('TV-provided icons take precedence over bundled brand fallback', async () => {
     await page({ catalog: CATALOG.map(a => a.id === 'org.tizen.netflix-app'
