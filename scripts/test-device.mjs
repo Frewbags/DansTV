@@ -184,3 +184,48 @@ test('Q80T launcher handles navigation but does not steal system remote buttons'
   assert.doesNotMatch(main + source, /addEventListener\s*\(\s*['"]tizenhwkey['"]/i,
     'TV web apps must use documented keyboard input, not mobile hardware key events');
 });
+
+test('Q80T Live TV shortcut opens Samsung viewer without a channel guess', () => {
+  const h = harness(), outcomes = [];
+  h.device.liveTV(error => outcomes.push(error));
+  assert.equal(h.launches.length, 1);
+  assert.equal(h.launches[0].id, 'org.tizen.tv-viewer');
+  h.launches[0].ok();
+  assert.deepEqual(outcomes, [null]);
+});
+
+test('named Australian apps resolve installed application IDs before launching', () => {
+  for (const [brand, record] of [
+    ['jellyfin', { id: 'AbCdEf1234.Jellyfin', name: 'Jellyfin', show: true }],
+    ['kayo', { id: 'eYuOiOLYQX.KayoSports', name: 'Kayo', show: true }],
+    ['7plus', { id: 'icp4AvUPiA.7plus', name: '7plus', show: true }],
+    ['9now', { id: 'Ne2ZsPWdKl.9NOW', name: '9Now', show: true }],
+    ['10play', { id: 'KaLitts8bq.tenplaySamsungTizen', name: '10', show: true }]
+  ]) {
+    const h = harness(), result = [];
+    h.device.launchNamed(brand, error => result.push(error));
+    assert.equal(h.launches.length, 0);
+    h.requests[0].ok([record]);
+    assert.equal(h.launches.length, 1);
+    assert.equal(h.launches[0].id, record.id);
+    h.launches[0].ok();
+    assert.deepEqual(result, [null]);
+  }
+});
+
+test('missing and ambiguous named apps fail rather than launching a wrong ID', () => {
+  const missing = harness(); let missingError;
+  missing.device.launchNamed('jellyfin', error => { missingError = error; });
+  missing.requests[0].ok([]);
+  assert.match(missingError.message, /not installed|cannot be discovered/i);
+  assert.equal(missing.launches.length, 0);
+
+  const ambiguous = harness(); let ambiguousError;
+  ambiguous.device.launchNamed('jellyfin', error => { ambiguousError = error; });
+  ambiguous.requests[0].ok([
+    { id: 'AbCdEf1234.Jellyfin', name: 'Jellyfin', show: true },
+    { id: 'AbCdEf1235.Jellyfin', name: 'Jellyfin', show: true }
+  ]);
+  assert.match(ambiguousError.message, /Multiple matching/);
+  assert.equal(ambiguous.launches.length, 0);
+});
