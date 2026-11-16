@@ -18,6 +18,9 @@ The public app uses Manrope, Geist and Newsreader. A personal widget containing 
 | --- | --- |
 | Simple Icons service marks | CC0; exact revisions and adaptations in `app/assets/icons/SOURCES.json` and `ADDITIONAL-SOURCES.json`. The CC0 text is retained beside the icons. |
 | Disney+, ABC and SBS marks | [Custom Brand Icons](https://github.com/elax46/custom-brand-icons), MIT. The retained licence is `app/assets/icons/CUSTOM-BRAND-ICONS-LICENSE.txt`. ABC and SBS sources were replaced during the public-source review. Exact revisions, source files and extraction/recolour notes are in `SOURCES.json`. |
+| Jellyfin mark | [Simple Icons](https://github.com/simple-icons/simple-icons/blob/develop/icons/jellyfin.svg), CC0. The Jellyfin project retains name/logo restrictions. |
+| Kayo, 7plus, 9Now and historical 10 Play marks | [Custom Brand Icons](https://github.com/elax46/custom-brand-icons) at the exact revisions in `app/assets/icons/ADDITIONAL-SOURCES.json`. **CC BY-NC-SA 4.0**, not MIT; white recolouring and adjusted viewBoxes are adaptations, also CC BY-NC-SA 4.0. Full licence in `app/assets/icons/CUSTOM-BRAND-ICONS-CC-BY-NC-SA-4.0.txt`. Attribution: custom-brand-icons contributors. Non-commercial and share-alike restrictions apply; do not redistribute these as MIT assets. |
+| Live TV outline | Original DansTV generic tuner/TV pictogram; not a Samsung logo. |
 | Art, apps, settings and home outlines | Original CleanFrame drawings, covered by the project's MIT licence. |
 
 Brand marks identify services. Their owners retain trademark rights; this project claims no endorsement or affiliation. The older Australian TV icon archive's GPL text is retained for historical provenance only; no current icon uses that archive.
