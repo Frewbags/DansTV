@@ -117,6 +117,36 @@ platform profile.
 Upstream: [v0.0.13 releases](https://github.com/chris-ritsen/samsung-tv-root/releases/tag/v0.0.13)
 and [generic archive route](https://github.com/chris-ritsen/samsung-tv-root/blob/master/QUICKSTART.md).
 
+### Verified Q80T test: generic archive route is unavailable
+
+**16 November 2026:** on QA65Q80TAWXXY / T-NKMUABC-2743.0,
+`probe-root.ps1 -Action Doctor` passed all **host** prerequisites,
+but `-Action Probe` returned:
+`TV is missing /usr/bin/dotnet; archive-root requires Samsung's capability-bearing dotnet host`.
+Therefore **the archive route cannot run on this firmware**. Do not
+retry using `--runtime`, swap in `dotnet-launcher`, or select a
+different model's `qn90b`/`qn90f` profile. The upstream tool exited
+before proving root; no persistent Home/debloat write was requested.
+
+**Next route: Remote PC / CIFS.** Tiz0wn reports UID-0 proofs on the
+related `T-NKMDEUC-2743.0` Q90T and persistent root on a Q74T.
+Check the physical **Home → Source → Remote Access → Remote PC** UI
+on the Q80T before constructing a disposable RDP+SMB lab host; its
+actual presence and credential/Shared Folder flow on the *Australian*
+firmware must be observed. Samsung's 2020 Q80T manual lists the feature.
+A bounded, volatile UID probe is the first target; do not stage the
+rootfs patch, SDK-account edits, or startup hook as part of that test.
+If the route works, analyse an **exact T-NKMUABC** firmware image
+before building any persistent payload. Never reuse offsets from NKMDEUC.
+
+**Windows host prerequisites for the disposable upstream lab** (not
+verified on this PC): `docker --version`, `docker compose version`,
+and `wsl --status`. Do not enable Remote Desktop or SMB sharing
+on the user's primary Windows installation: use an isolated lab
+container/VM and dedicated credentials. The Q80T acts as an RDP
+client, so the PC/VM hosts the endpoint; checking port 3389 on the TV
+will not establish support.
+
 ## Step 2: Root route — separate, firmware-gated stage
 
 1. Clone tiz0wn into ignored `.local/tiz0wn-upstream` or a separate development
