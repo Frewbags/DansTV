@@ -1244,7 +1244,7 @@
     matScrim.style.left = (-g.x) + 'px'; matScrim.style.top = (SCRIM_Y - g.y) + 'px';
     matScrim.style.transformOrigin = '960px ' + (g.y + g.h / 2 - SCRIM_Y) + 'px';
     shelf.style.width = g.shelf + 'px';
-    shelf.className = 'shelf' + (g.broad && off > 0 ? ' fade-l' : '') + (g.broad && off + g.shelf < n * g.pitch - 8 ? ' fade-r' : '');
+    shelf.className = 'shelf'; // No faded first/last tile: show six complete apps.
 
     keyed(track, empty ? [] : items, function (el, it, i) {
       var a = it.id ? app(it.id) : null, left = i * g.pitch, focus = tileFocus && i === anchor, sel = tileSel && i === anchor;
