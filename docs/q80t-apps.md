@@ -15,6 +15,9 @@ Default Dock order (16 items; 16 maximum):
 11. 10 (10 Play, subject to app branding on the device)
 12. Apple TV
 13. Apple Music
+14. Nintendo Switch (HDMI port configured in DansTV Settings)
+15. Nintendo Switch 2 (HDMI port configured in DansTV Settings)
+16. PlayStation 4 (HDMI port configured in DansTV Settings)
 14. Nintendo Switch
 15. Nintendo Switch 2
 16. PlayStation 4
@@ -40,3 +43,9 @@ The existing streaming marks remain local SVG silhouettes. New bundled Jellyfin,
 In **Settings → Consoles**, choose Nintendo Switch, Nintendo Switch 2 or PlayStation 4 and assign an input manually (HDMI 1–4); **Unassigned** removes a mapping without removing the icon. The assignments are saved in `consolePorts` within the existing TV-local preferences and survive restarts. No TV IP, DUID or signing certificate is stored in these mappings.
 
 The console tiles use locally bundled, individually attributed logo silhouettes. Clicking an unassigned shortcut displays a clear message instead of guessing a port. The selected HDMI port is passed to Tizen's TV window source API; when device discovery is missing or denies access, a manually configured numeric HDMI source is attempted. This fallback may not be supported by every Q80T firmware; users can still select an input using the TV remote. It does not control which console is selected by an external HDMI switch.
+
+## Console HDMI shortcut setup
+
+Go to **Settings → Consoles**, select **Nintendo Switch**, **Nintendo Switch 2**, or **PlayStation 4**, then select **HDMI 1–4** or **Unassigned**. The assignment is saved in local Tizen web-app storage and survives an ordinary application restart. Console shortcuts use a locally bundled logo, even when Samsung does not identify the connected hardware. Device auto-detection may identify active HDMI ports, but cannot be relied on to distinguish two consoles on an external HDMI switch. The first console launch is never attempted without a saved port mapping. Manual mapping can ask Tizen to switch even if VIDEOSOURCE enumeration fails; an unsupported or blocked TV input results in an error, not silent success.
+
+The three console logos are derived from attributed Sentry Platformicons (Nintendo Switch/Switch 2) and Simple Icons (PlayStation 4), with source locations and licences in `app/assets/icons/ADDITIONAL-SOURCES.json` and `THIRD_PARTY_NOTICES.md`. Logo names and shapes remain third-party trademarks.
