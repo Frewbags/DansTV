@@ -24,17 +24,17 @@
     { id: 'sbs', name: 'SBS On Demand', mark: true, appId: 'OyE7OuxlUi.SBSOnDemand' },
     { id: 'applemusic', name: 'Apple Music', mark: true, appId: 'org.tizen.apple.apple-music' },
     { id: 'livetv', name: 'Live TV', mark: true, appId: '' },
-    { id: 'jellyfin', name: 'Jellyfin', mark: false, appId: '' },
-    { id: 'kayo', name: 'Kayo', mark: false, appId: '' },
-    { id: '7plus', name: '7plus', mark: false, appId: '' },
-    { id: '9now', name: '9Now', mark: false, appId: '' },
-    { id: '10play', name: '10', mark: false, appId: '' }
+    { id: 'jellyfin', name: 'Jellyfin', mark: true, appId: '' },
+    { id: 'kayo', name: 'Kayo', mark: true, appId: '' },
+    { id: '7plus', name: '7plus', mark: true, appId: '' },
+    { id: '9now', name: '9Now', mark: true, appId: '' },
+    { id: '10play', name: '10', mark: true, appId: '' }
   ];
   var PRIMARY = PRIMARY_APPS.map(function (a) { return a.id; }), APPS = PRIMARY_APPS.slice(), ALPHA = [];
   /* Preserve optional legacy apps; do not force them onto Home. */
   var LEGACY_DEFAULT_HOME = ['stremio', 'netflix', 'disneyplus', 'youtube', 'appletv', 'primevideo', 'abciview', 'sbs', 'applemusic'];
   var DEFAULT_HOME = ['livetv', 'netflix', 'primevideo', 'youtube', 'jellyfin', 'kayo', 'abciview', 'sbs', '7plus', '9now', '10play', 'appletv', 'applemusic'];
-  var LOCAL_MARKS = ['stremio', 'netflix', 'disneyplus', 'youtube', 'appletv', 'primevideo', 'abciview', 'sbs', 'applemusic', 'livetv', 'spotify', 'tubi', 'hbomax'];
+  var LOCAL_MARKS = ['stremio', 'netflix', 'disneyplus', 'youtube', 'appletv', 'primevideo', 'abciview', 'sbs', 'applemusic', 'livetv', 'jellyfin', 'kayo', '7plus', '9now', '10play', 'spotify', 'tubi', 'hbomax'];
   var WALLS = window.CleanFrameWallpapers || [{ id: 'misty', name: 'Misty coast', tone: 'light', ut: { tr: 'mist', br: 'mist' }, frostVeil: .20 }];
   var ADAPTIVE_INK = window.CleanFrameAdaptiveInk || {};
   WALLS.forEach(function (w) { w.ut = w.ut || { tr: 'light', br: 'light' }; w.frostVeil = w.frostVeil || .12; });
@@ -148,7 +148,7 @@
       + (maskSupport ? '<span class="mk" style="' + st + ';-webkit-mask-image:url(' + ICONS + id + '.svg);mask-image:url(' + ICONS + id + '.svg)"></span>' : '<img alt="" src="' + ICONS + id + '.svg" style="' + st + '">') + '</span>';
   }
   function appMark(a, w, h, size) {
-    if (a.mark && (maskSupport || S.c.bg !== 'light')) return markHtml(a.brand || a.id, w, h, size);
+    if (a.mark) return markHtml(a.brand || a.id, w, h, size);
     var words = a.name.split(/\s+/), letters = words[0].charAt(0) + (words.length > 1 ? words[1].charAt(0) : '');
     return '<span class="mark monogram' + (a.icon ? ' native-icon' : '') + '" style="width:' + w + 'px;height:' + h + 'px;font-size:' + Math.round(size * .65) + 'px"><span>' + esc(letters.toUpperCase()) + '</span>'
       + (a.icon ? '<img alt="" data-native-icon="true" src="' + esc(a.icon) + '">' : '') + '</span>';
@@ -1188,25 +1188,14 @@
   }
 
   function dockGeom(n) {
-    var m = DOCK_MODES[S.c.apps], vis = Math.max(1, Math.min(5, n)), shelfW = vis * m.pitch - 8, w = shelfW + 32;
-    var broad = S.geom === 'broad' && n > 5;
+    var m = DOCK_MODES[S.c.apps], vis = Math.max(1, Math.min(6, n)), shelfW = vis * m.pitch - 8, w = shelfW + 32;
+    var broad = S.geom === 'broad' && n > 6;
     if (n < 0) { w = 912; shelfW = 880; }
-    else if (broad) { w = 1728; shelfW = 1696; }
     return { x: Math.round((1920 - w) / 2), y: 908 - m.th - 32, h: m.th + 32, w: w, shelf: shelfW, vis: vis, broad: broad, empty: n < 0, tw: m.tw, th: m.th, pitch: m.pitch };
   }
-  /* Five centred: the window moves one tile when focus passes an edge. Broad: keep a
-     148px glimpse of the neighbour, as the current dock does. */
+  /* Exactly six complete dock tiles remain visible, with whole-tile scrolling. */
   function dockOffset(n, i, g) {
-    var off, left, first, glimpse = g.tw / 2;
-    if (g.broad) {
-      off = scroll.off * g.pitch; left = i * g.pitch;
-      if (left - off < (i > 0 ? glimpse : 0)) off = left - (i > 0 ? glimpse : 0);
-      if (left + g.tw - off > g.shelf - (i < n - 1 ? glimpse : 0)) off = left + g.tw - g.shelf + (i < n - 1 ? glimpse : 0);
-      off = clamp(off, 0, Math.max(0, n * g.pitch - 8 - g.shelf));
-      if (!S.reflow) { scroll.off = off / g.pitch; scroll.first = Math.round(scroll.off); }
-      return off;
-    }
-    first = clamp(scroll.first, 0, Math.max(0, n - g.vis));
+    var first = clamp(scroll.first, 0, Math.max(0, n - g.vis));
     if (i < first) first = i;
     if (i > first + g.vis - 1) first = i - g.vis + 1;
     if (!S.reflow) { scroll.first = first; scroll.off = first; }
