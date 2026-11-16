@@ -24,9 +24,13 @@ def owner_identity():
 
 def main():
     parser = argparse.ArgumentParser()
+    parser.add_argument('--check', action='store_true', help='Validate private owner configuration without producing a widget.')
     parser.add_argument('--verify', metavar='SIGNED_WGT', type=Path, help='Validate a signed owner widget without installing it.')
     args = parser.parse_args()
     identity = owner_identity()
+    if args.check:
+        print('Owner identity configuration is valid: ' + identity['app_id'])
+        return
     if args.verify:
         check_signed_widget(args.verify, identity)
         print('Signed widget structure, owner identity and private-file checks passed (not a cryptographic signature validation).')
