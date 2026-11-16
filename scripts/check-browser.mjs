@@ -4,7 +4,7 @@ import { mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { openPreview, root } from './browser.mjs';
 
 const KEY = 'cleanframe.home.v1';
-const PRIMARY = ['livetv', 'netflix', 'primevideo', 'youtube', 'jellyfin', 'kayo', 'abciview', 'sbs', '7plus', '9now', '10play', 'appletv', 'applemusic'];
+const PRIMARY = ['livetv', 'netflix', 'primevideo', 'youtube', 'jellyfin', 'kayo', 'abciview', 'sbs', '7plus', '9now', '10play', 'appletv', 'applemusic', 'switch', 'switch2', 'ps4'];
 const IDS = ['IkWsFHtOY9.Stremio', 'org.tizen.netflix-app', 'MCmYXNxgcu.DisneyPlus', '9Ur5IzDKqV.TizenYouTube', 'com.samsung.tv.aria-video', 'org.tizen.primevideo', 'mWK87Xghap.ABCiview', 'OyE7OuxlUi.SBSOnDemand', 'org.tizen.apple.apple-music'];
 const NAMES = ['Stremio', 'Netflix', 'Disney+', 'YouTube', 'Apple TV', 'Prime Video', 'ABC iview', 'SBS On Demand', 'Apple Music'];
 const EXTRA = 'AbCdEf1234.FamilyApp', SPOTIFY = 'rJeHak5zRg.Spotify';
@@ -250,7 +250,7 @@ try {
     await closePage();
     await page({ seed: { dock: [], wallpaper: 'missing', mode: 'constructor', theme: 'constructor' } });
     const s = await state();
-    check('Invalid values recover usable bounded Home', s.dock.length >= 1 && s.dock.length <= 14 && walls.some(w => w.id === s.wallpaper) && ['fixed', 'open', '5', '15', '60'].includes(s.mode), s);
+    check('Invalid values recover usable bounded Home', s.dock.length >= 1 && s.dock.length <= 16 && walls.some(w => w.id === s.wallpaper) && ['fixed', 'open', '5', '15', '60'].includes(s.mode), s);
     await closePage();
     await page({ seed: baseline({ dock: [EXTRA, 'netflix'], lastApp: EXTRA }), catalogFailure: true });
     await library();
@@ -475,7 +475,7 @@ try {
         && layout.seventh.right > layout.screenRight + 0.5, layout);
     }
     await look({ apps: 'both' });
-    for (const icon of ['livetv', 'netflix', 'primevideo', 'youtube', 'jellyfin', 'kayo', 'abciview', 'sbs', '7plus', '9now', '10play', 'appletv', 'applemusic']) {
+    for (const icon of ['livetv', 'netflix', 'primevideo', 'youtube', 'jellyfin', 'kayo', 'abciview', 'sbs', '7plus', '9now', '10play', 'appletv', 'applemusic', 'switch', 'switch2', 'ps4']) {
       const response = await current.request.get(preview.baseURL + '/home/assets/icons/' + icon + '.svg');
       check(icon + ' brand icon is locally bundled', response.ok() && (await response.text()).includes('<svg'));
     }
@@ -490,6 +490,37 @@ try {
         focus: document.querySelector('#track .tile.is-focus')?.getAttribute('data-action') };
     });
     check('Remote right scrolls one complete tile at a time', moved.visible === 6 && moved.focus === 'home.app.sbs', moved);
+  });
+
+  await run('Console shortcuts use editable saved HDMI ports', async () => {
+    await page();
+    const initial = await state();
+    check('Three named console shortcuts are present but unassigned', ['switch', 'switch2', 'ps4'].every(id =>
+      initial.dock.includes(id) && initial.consolePorts[id] === null));
+    await act('home.app.switch'); await current.waitForFunction(() => ShoreQA.where().view === 'message');
+    check('Unassigned console does not switch inputs', (await current.evaluate(() => __tv.calls.length)) === 0
+      && /assign/i.test(await current.locator('#stage').innerText()));
+    await nav('back');
+    await group('consoles');
+    await act('console.select.switch');
+    check('Switch mapping opens five available input choices', ['0','1','2','3','4'].every(p =>
+      true) && (await current.locator('[data-action^="console.map.switch."]').count()) === 5);
+    await act('console.map.switch.2');
+    const mapped = await stored();
+    check('Explicit port 2 assignment persists locally', mapped.consolePorts.switch === 2);
+    await nav('back'); await nav('back'); await scene('home');
+    await act('home.app.switch');
+    await current.waitForFunction(() => __tv.calls.some(c => c.method === 'setSource'));
+    const selected = await current.evaluate(() => __tv.calls.find(c => c.method === 'setSource'));
+    check('Switch activates only the assigned HDMI input', selected.number === 2, selected);
+    await current.reload(); await ready();
+    check('Saved mapping survives reload', (await state()).consolePorts.switch === 2);
+    await group('consoles'); await act('console.select.switch'); await act('console.map.switch.0');
+    check('Unassigning a shortcut is saved', (await stored()).consolePorts.switch === null);
+    await closePage();
+    await page({ seed: baseline({ consolePorts: { switch: '2', switch2: -2, ps4: 99 } }) });
+    check('Malformed HDMI assignments are rejected', ['switch','switch2','ps4'].every(id =>
+      !ShoreQA.state().consolePorts[id]));
   });
   await run('TV-provided icons take precedence over bundled brand fallback', async () => {
     await page({ catalog: CATALOG.map(a => a.id === 'org.tizen.netflix-app'
@@ -590,10 +621,11 @@ try {
     await act('editor.move.netflix'); await nav('down', 'ok');
     const moved = start.slice(); [moved[1], moved[2]] = [moved[2], moved[1]];
     check('Placed move persists immediately', same((await stored()).dock, moved));
-    await act('editor.add.' + EXTRA); check('Fourteenth app can be added', (await state()).dock.length === 14 && (await state()).dock.includes(EXTRA));
-    await act('editor.add.' + SPOTIFY); check('Fourteen-app cap prevents overflow', (await state()).dock.length === 14 && !(await state()).dock.includes(SPOTIFY));
+    await remove('switch'); await act('editor.add.' + EXTRA);
+    check('Console can be replaced by a native installed app', (await state()).dock.length === 16 && (await state()).dock.includes(EXTRA));
+    await act('editor.add.' + SPOTIFY); check('Sixteen-app cap prevents overflow', (await state()).dock.length === 16 && !(await state()).dock.includes(SPOTIFY));
     await remove('livetv'); await act('editor.add.livetv');
-    check('Native app can be pinned with stable ID', (await stored()).dock.includes(EXTRA) && (await state()).dock.length === 14);
+    check('Native app can be pinned with stable ID', (await stored()).dock.includes(EXTRA) && (await state()).dock.length === 16);
     check('Native pin retains readable metadata for failed discovery', (await stored()).appRecords.some(a => a.id === EXTRA && a.name === UNSAFE_NAME));
     await current.reload(); await ready(); check('Native pin survives reload', (await state()).dock.includes(EXTRA));
     await editor(); const ids = (await state()).dock;
@@ -648,8 +680,8 @@ try {
   });
   await run('Settings overview and visible choices', async () => {
     await page(); await scene('settings');
-    const expected = ['settings.group.background', 'settings.group.layout', 'settings.group.typography', 'settings.group.focus', 'settings.editor', 'settings.group.samsung'];
-    check('Overview has all six settings groups', same((await call('actions')).filter(a => expected.includes(a)).sort(), expected.slice().sort()));
+    const expected = ['settings.group.background', 'settings.group.layout', 'settings.group.typography', 'settings.group.focus', 'settings.editor', 'settings.group.consoles', 'settings.group.samsung'];
+    check('Overview has all seven settings groups', same((await call('actions')).filter(a => expected.includes(a)).sort(), expected.slice().sort()));
     const specs = {
       background: { bg: ['dark', 'light', 'photo'] },
       layout: { layout: ['list', 'dock'], apps: ['icons', 'both', 'text'], controls: ['icons', 'both', 'text'] },
@@ -1095,7 +1127,7 @@ try {
   await run('Physical-key repeats and Back hierarchy', async () => {
     await page(); await editor(); await remove('netflix');
     await current.keyboard.down('Enter'); await current.keyboard.down('Enter');
-    check('Held OK restores once without removing again', (await state()).dock.includes('netflix') && (await state()).dock.length === 13);
+    check('Held OK restores once without removing again', (await state()).dock.includes('netflix') && (await state()).dock.length === 16);
     await current.keyboard.up('Enter');
     await current.keyboard.down('Escape'); await current.keyboard.down('Escape');
     check('Held Back closes one layer only', (await call('where')).view === 'settings' && (await state()).focusAction === 'settings.editor');
