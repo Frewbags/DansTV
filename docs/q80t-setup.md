@@ -1,6 +1,6 @@
 # DansTV on Samsung Q80T — Windows setup
 
-**Status:** untested on your Q80T. The minimum Tizen 5.0 manifest version is not proof of device compatibility.
+**Status:** the owner has signed the independent DansTV widget, passed 16 device tests and 452 browser checks, and begun first-hardware launch. Feature and responsiveness verification on the actual Q80T remains ongoing.
 
 ## Safety
 
@@ -72,6 +72,6 @@ Run python scripts/check-offline.py: it scans bundled JavaScript, HTML and CSS f
 
 Browser performance checks are not Q80T performance benchmarks. Measure responsiveness and memory on the actual TV before removing features.
 
-## Native Home
+## Tizen 5.5 Home takeover and debloating
 
-Out of scope. A separate firmware-specific investigation must validate getter/setter APIs, original-state snapshots and a confirmed independent restore route. Never bypass the model and firmware guards in the Frame 2020 source.
+The optional [tiz0wn integration](../scripts/tiz0wn/README.md) now contains a Windows read-only Q80T preflight, root-side CPU/RAM and package snapshot, and a separately staged Home-key database remap plus exact-value restore. It adapts the Tizen 5.5 `tvctx-manager`/`.app-context.db` approach measured on another 2020 TV. **None of these are installed or proven on the Q80T yet.** The existing reference-Frame native helper has different guards and must not be reused unmodified. Full firmware identification, a validated root transport, off-TV database backup, explicit write and restore trial precede a permanent takeover. For debloating, use the audited upstream `pkgstate` plan/enable/disable tools one candidate at a time rather than deleting unknown packages.
