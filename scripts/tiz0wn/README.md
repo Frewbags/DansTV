@@ -3,6 +3,19 @@
 This integration applies the experimentally validated *architecture* from
 [sebastianspicker/tiz0wn](https://github.com/sebastianspicker/tiz0wn) to the
 Samsung QA65Q80TAWXXY (Q80T, Tizen 5.5/ARMv7).
+The owner supplied an About This TV photo showing **T-NKMUABC-2743.0**
+(build field **B2052220/A70B05**). Do not commit the serial number, TVkey,
+MAC addresses or other device-unique fields visible on that screen.
+
+Samsung documents T-NKMUABC as one of its 2020 NKM firmware variants;
+the T-NKMDEUC-2743.0 Q90T in tiz0wn's published case is related, not
+binary-identical. Both are useful for *method* comparison, but the correct
+firmware is **T-NKMUABC**, not **T-NKMDEUC**. The owner preflight requires
+the former exact string when `-Firmware` is provided, and does not claim
+the SDB capability call can verify a full firmware build.
+Source: https://security.samsungtv.com/securityUpdates
+Samsung model page: https://www.samsung.com/au/support/model/QA65Q80TAWXXY/
+
 Tiz0wn is MIT-licensed (Copyright © 2026 Sebastian J. Spicker); see upstream
 `LICENSE` and `NOTICE.md`. This code is adapted, not an assertion that its
 Q60T firmware offsets apply to a Q80T.
@@ -38,12 +51,13 @@ This TV**, including the full software/build identifier, not just "Tizen 5.5".
 Then:
 
 ```powershell
-.\scripts\tiz0wn\preflight.ps1 -Firmware "FULL-BUILD-AS-SHOWN-ON-TV"
+.\scripts\tiz0wn\preflight.ps1 -Firmware "T-NKMUABC-2743.0"
 ```
 
 These commands only request SDB capabilities and write a private
-`.local/tiz0wn-preflight.json` on the PC. The currently known Q80T details
-are Tizen 5.5, ARMv7 and `intershell_support=disabled`. They do **not** prove
+`.local/tiz0wn-preflight.json` on the PC. The confirmed Q80T details
+are model `QA65Q80TAWXXY`, firmware `T-NKMUABC-2743.0`,
+Tizen 5.5, ARMv7 and `intershell_support=disabled`. They do **not** prove
 root access or tell us which rootfs partition, vulnerability path or block
 offset the Q80T uses.
 
@@ -55,7 +69,8 @@ offset the Q80T uses.
 2. Use the Q80T's *exact* firmware and full build string to decide whether any
    root route applies. Tiz0wn's verified Q60T profile
    (`GQ55Q60TGUXZG / T-NKLDEUC-REL-202607022001`) is not the Q80T.
-   Its Q90T report describes the NKM family, but also is not a Q80T test.
+   Its Q90T report describes the related `T-NKMDEUC` family,
+   but that is a different regional image from Q80T's `T-NKMUABC`.
 3. Run upstream's **offline** builder tests before attempting a TV exploit.
    Derive hash/offset targets from the **matching official Q80T firmware**.
    Never reuse the Q60T's p19 or Q90T's p18 patch offsets.
