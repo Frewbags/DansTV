@@ -46,5 +46,23 @@
     "source": "https://github.com/elax46/custom-brand-icons/blob/2025.5.0/icon-svg/10-play.svg",
     "licence": "CC BY-NC-SA 4.0",
     "note": "Historical 10 Play mark; 2025 rebranded 10 service may use different official app icon; white mask, cropped viewBox; NOT an authorised official distribution."
+  },
+  {
+    "icon": "switch",
+    "source": "https://github.com/getsentry/platformicons/blob/main/svg/nintendo-switch.svg",
+    "licence": "OFL-1.1 (upstream package metadata)",
+    "note": "Nintendo Switch console silhouette adapted to a monochrome cropped SVG; Nintendo trademark retained. Refer to existing SIL OFL 1.1 text in app/assets/manrope-OFL.txt."
+  },
+  {
+    "icon": "switch2",
+    "source": "https://github.com/getsentry/platformicons/blob/main/svg/nintendo-switch-2.svg",
+    "licence": "OFL-1.1 (upstream package metadata)",
+    "note": "Nintendo Switch 2 silhouette and numeral 2; omits tiny wordmark to remain legible at TV scale. Nintendo trademark retained. Refer to existing SIL OFL 1.1 text in app/assets/manrope-OFL.txt."
+  },
+  {
+    "icon": "ps4",
+    "source": "https://github.com/simple-icons/simple-icons/blob/develop/icons/playstation4.svg",
+    "licence": "CC0-1.0",
+    "note": "PlayStation 4 wordmark adapted to a monochrome cropped SVG. Sony trademark retained."
   }
 ]
