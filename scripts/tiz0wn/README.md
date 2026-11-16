@@ -204,6 +204,72 @@ environment can be tested on its own before changing the TV-side
 credential field. Share credentials privately; do not commit them or paste
 them into a public chat.
 
+### One-shot UID callback proof (Q80T; no firmware patch)
+
+When both PC-side ports are live and the TV has **actually displayed a JPG**
+via Samsung Shared Folder, use the reversible `uid-probe.ps1` helper
+to test whether the Q80T shares the Q60T Remote PC credential injection.
+This is a live local-owner security test, not a read-only operation.
+
+Open an **elevated** PowerShell window:
+
+```powershell
+cd C:\Users\Daniel\DansTV
+.\scripts\tiz0wn\uid-probe.ps1 -Action Prepare
+```
+
+It copies the original `lab.env` to ignored
+`.local/tiz0wn-lab/lab.env.before-uid`, rotates the **temporary**
+Windows `danstvprobe` password and Docker XRDP login to the
+identical, ~60-character string printed by the helper, and opens a
+TV-IP-restricted Windows firewall rule for PC TCP/8181. It does not
+modify the primary Windows account or any existing shares.
+The Docker `env_file` uses Compose `format: raw` to avoid accidental
+interpolation of the literal Bash expressions in the password.
+
+Open a **second elevated** PowerShell window and run:
+
+```powershell
+cd C:\Users\Daniel\DansTV
+.\scripts\tiz0wn\uid-probe.ps1 -Action Listen
+```
+
+The callback listens on the recorded host IP TCP/8181, accepts one
+request from the Q80T address, and replies HTTP 204. It stops after
+one TV request or a timeout. A request to `/0` yields
+`UID0-PROOF`; another numeric path reports a nonzero EUID;
+absence of a callback is **inconclusive** and does not prove the TV
+is patched.
+
+**On the TV:** leave the previous RDP session, edit the existing
+Remote PC connection's password to the printed probe **exactly**
+(including shell characters), ensure **Remember credentials** is on,
+reconnect using username `danstvprobe`, then open Samsung's **Shared
+Folder** control and select `DansTVProbe` once. An RDP or SMB login
+failure before reaching Shared Folder is not a root-test result.
+Do not paste the temporary credentials into chat or GitHub.
+
+Regardless of the test outcome:
+
+```powershell
+.\scripts\tiz0wn\uid-probe.ps1 -Action Restore
+.\scripts\tiz0wn\rdp-lab.ps1 -Action Status
+```
+
+This puts the original temporary `danstvprobe` password back in
+Windows and XRDP, stops using the one-shot callback, deletes the extra
+firewall rule and removes the temporary credential backup. Restore
+the **TV saved** Remote PC password as well. When testing is complete,
+`rdp-lab.ps1 -Action Cleanup` removes the lab account/share,
+including any remaining one-shot callback firewall rule and backup.
+
+The callback URL contains the Bash effective-UID variable, not
+persistent device changes. Actual `root` proof is limited to this
+specific execution path. Unlike the stock Q60T proof, it depends on
+a network callback being permitted; callback failure can also mean
+credentials were rejected, a TV field character was changed, shell
+parsing differed or networking failed.
+
 ## Step 2: Root route — separate, firmware-gated stage
 
 1. Clone tiz0wn into ignored `.local/tiz0wn-upstream` or a separate development
