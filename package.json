@@ -18,7 +18,9 @@
     "lint": "eslint app",
     "check:device": "node --test scripts/test-device.mjs",
     "check:performance": "node scripts/check-performance.mjs",
-    "check:offline": "python scripts/check-offline.py"
+    "check:offline": "python scripts/check-offline.py",
+    "win:preview": "python scripts/preview.py --public-fonts",
+    "win:check": "npm run lint && python scripts/check.py && npm run check:device && npm run check:offline"
   },
   "devDependencies": {
     "eslint": "10.13.0",
