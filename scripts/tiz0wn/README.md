@@ -83,6 +83,40 @@ decryption, extraction, exploit or TV-side operation is performed. Archive
 filenames alone do **not** establish the embedded release version or root
 patch compatibility; any later firmware parser must verify that separately.
 
+### First root attempt: generic archive route (Windows)
+
+The [upstream samsung-tv-root](https://github.com/chris-ritsen/samsung-tv-root)
+v0.0.13 release (14 November 2026) includes an alternative **archive-root**
+path, without a model whitelist. The tool attempts root and checks the target
+for a capability-bearing Samsung .NET host, tar and the SDB foothold. It has
+not been verified on this Q80T. The related NKMDEUC Q90T report lacked
+`/usr/bin/dotnet`, so this Q80T may also be incompatible.
+
+Use `probe-root.ps1`, which downloads the official Windows x86-64 release
+into ignored `.local/`, verifies its published SHA-256 and passes the
+configured Samsung SDB path. The tool never signs or replaces the DansTV WGT.
+
+```powershell
+.\scripts\tiz0wn\preflight.ps1 -Firmware T-NKMUABC-2743.0
+.\scripts\tiz0wn\probe-root.ps1 -Action Prepare
+.\scripts\tiz0wn\probe-root.ps1 -Action Doctor
+# This next command executes an actual SDB exploitation/root attempt:
+.\scripts\tiz0wn\probe-root.ps1 -Action Probe
+```
+
+`Prepare` is download-only. `Doctor` checks the host. `Probe` exercises
+the SDB package-name vulnerability and **attempts temporary root access**,
+then performs the upstream cleanup. It does not modify Home, disable packages
+or install a persistent boot hook, though a failed attempt might leave
+temporary staging files. Do not confuse `doctor` with an on-TV compatibility
+check, or `Probe` with a safe read-only query. If the probe reports missing
+.NET or capabilities, record that result and move to firmware-specific
+Remote PC/CIFS or USB exploitation instead of forcing a different
+platform profile.
+
+Upstream: [v0.0.13 releases](https://github.com/chris-ritsen/samsung-tv-root/releases/tag/v0.0.13)
+and [generic archive route](https://github.com/chris-ritsen/samsung-tv-root/blob/master/QUICKSTART.md).
+
 ## Step 2: Root route — separate, firmware-gated stage
 
 1. Clone tiz0wn into ignored `.local/tiz0wn-upstream` or a separate development
