@@ -80,7 +80,7 @@ switch ($Action) {
             $localPC.AddressFamily -ne [Net.Sockets.AddressFamily]::InterNetwork -or
             $localPC.IsIPv6LinkLocal) { throw "Unexpected PC source address: $pcIP" }
         $rng = [Security.Cryptography.RandomNumberGenerator]::Create()
-        $bytes = New-Object byte[] 18
+        $bytes = New-Object byte[] 6
         try { $rng.GetBytes($bytes) } finally { $rng.Dispose() }
         $password = 'TvA9' + ([BitConverter]::ToString($bytes) -replace '-', '')
         New-Item -ItemType Directory -Force -Path $folder | Out-Null
