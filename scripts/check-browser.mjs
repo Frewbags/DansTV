@@ -1149,4 +1149,5 @@ finally {
   writeFileSync(out + 'checks.json', JSON.stringify(report, null, 2) + '\n');
 }
 console.log(report.checks.filter(c => c.passed).length + ' checks passed; ' + report.failures.length + ' failure(s). Report: .local/qa/checks.json');
+if (!report.checks.length && report.failures.length) console.error('Browser startup error: ' + (report.failures[0].error || report.failures[0].name || JSON.stringify(report.failures[0])).split('\n').slice(0, 4).join('\n'));
 if (report.failures.length) process.exitCode = 1;
