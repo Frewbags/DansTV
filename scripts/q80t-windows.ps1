@@ -54,14 +54,13 @@ if ($Action -eq 'Sign') {
     $folder = Join-Path $root ('dist\signed-q80t-' + [guid]::NewGuid().ToString('N'))
     New-Item -ItemType Directory -Path $folder | Out-Null
 
-    # A new output folder prevents a stale signed package from masking an SDK failure.
+    # The official Tizen CLI re-signs an existing .wgt in place.
+    # Copy to a unique folder first to avoid accidentally validating a stale package.
+    $staged = Join-Path $folder 'DansTV.wgt'
+    Copy-Item -LiteralPath $unsigned -Destination $staged
     # Do not print SDK signing output: it may contain certificate/profile secrets.
-    & $tizen package -t wgt -s ([string]$config.profile) -o $folder -- $unsigned 2>&1 | Out-Null
+    & $tizen package -t wgt -s ([string]$config.profile) -- $staged 2>&1 | Out-Null
     if ($LASTEXITCODE -ne 0) { throw 'Signing failed; check Certificate Manager and saved profile access.' }
-    $staged = Join-Path $folder 'DansTV-unsigned.wgt'
-    if (-not (Test-Path -LiteralPath $staged -PathType Leaf)) {
-        throw 'Tizen CLI did not create the expected signed widget.'
-    }
     Invoke-Python -Arguments @('--verify', $staged)
     Copy-Item -LiteralPath $staged -Destination $signed -Force
     Write-Output 'Signed owner widget prepared: dist\DansTV.wgt'
