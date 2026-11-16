@@ -453,6 +453,44 @@ try {
     await current.waitForSelector('[data-action="inputs.retry"]');
     check('Empty inventory is truthful', (await current.locator('#stage').innerText()).includes('No HDMI inputs were reported'));
   });
+  await run('Six visible dock apps with locally bundled brand icons', async () => {
+    await page();
+    for (const display of ['both', 'icons', 'text']) {
+      await look({ layout: 'dock', apps: display });
+      await current.waitForTimeout(240);
+      const layout = await current.evaluate(() => {
+        const shelf = document.getElementById('shelf').getBoundingClientRect();
+        const tiles = Array.from(document.querySelectorAll('#track .tile.k-app')).map(e => {
+          const r = e.getBoundingClientRect();
+          return { left: r.left, right: r.right };
+        });
+        return {
+          screenLeft: shelf.left, screenRight: shelf.right, shelfWidth: shelf.width,
+          fullyVisible: tiles.filter(r => r.left >= shelf.left - 0.5 && r.right <= shelf.right + 0.5).length,
+          fifth: tiles[4], sixth: tiles[5], seventh: tiles[6]
+        };
+      });
+      check(display + ': exactly six complete dock tiles', layout.fullyVisible === 6
+        && layout.sixth.right <= layout.screenRight + 0.5
+        && layout.seventh.right > layout.screenRight + 0.5, layout);
+    }
+    await look({ apps: 'both' });
+    for (const icon of ['livetv', 'netflix', 'primevideo', 'youtube', 'jellyfin', 'kayo', 'abciview', 'sbs', '7plus', '9now', '10play', 'appletv', 'applemusic']) {
+      const response = await current.request.get(preview.baseURL + '/home/assets/icons/' + icon + '.svg');
+      check(icon + ' brand icon is locally bundled', response.ok() && (await response.text()).includes('<svg'));
+    }
+    const marks = await current.evaluate(() => Array.from(document.querySelectorAll('#track [data-mark]'), e => e.getAttribute('data-mark')));
+    check('Home tiles render brand marks rather than monograms', ['livetv', 'jellyfin', 'kayo', '7plus', '9now', '10play'].every(id => marks.includes(id)), marks);
+    await nav(...Array(6).fill('right'));
+    await current.waitForTimeout(240);
+    const moved = await current.evaluate(() => {
+      const shelf = document.getElementById('shelf').getBoundingClientRect();
+      const tiles = Array.from(document.querySelectorAll('#track .tile.k-app'));
+      return { visible: tiles.filter(e => { const r = e.getBoundingClientRect(); return r.left >= shelf.left - 0.5 && r.right <= shelf.right + 0.5; }).length,
+        focus: document.querySelector('#track .tile.is-focus')?.getAttribute('data-action') };
+    });
+    check('Remote right scrolls one complete tile at a time', moved.visible === 6 && moved.focus === 'home.app.sbs', moved);
+  });
   await run('Real catalogue and native launch boundary', async () => {
     await page(); await library();
     const names = await current.locator('[data-action^="apps.open."] .label').allTextContents();
