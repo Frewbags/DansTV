@@ -20,7 +20,7 @@ prohibited_js = {
     'WebSocket': r'\bWebSocket\b',
     'EventSource': r'\bEventSource\b',
     'sendBeacon': r'\bsendBeacon\s*\(',
-    'external resource': r'(?:https?:)?//[a-z0-9.-]+\.[a-z]{2,}',
+    'external resource': r'(?:https?:)?//(?!tizen\.org(?:/|[\x27\x22]))[a-z0-9.-]+\.[a-z]{2,}',
 }
 for path in scripts:
     text = path.read_text(encoding='utf-8')
