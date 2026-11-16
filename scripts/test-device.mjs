@@ -161,3 +161,26 @@ test('unknown and invalid ports cannot be substituted and a newer request cancel
   h.sourceRequests[0].ok(video); assert.equal(h.changes.length, 0);
   h.sourceRequests[1].ok(video); assert.equal(h.changes[0].source.number, 2);
 });
+
+
+test('Q80T launcher handles navigation but does not steal system remote buttons', () => {
+  const main = readFileSync(new URL('../app/main.js', import.meta.url), 'utf8');
+  const expression = main.match(/\bvar KEYS\s*=\s*\{([^}]+)\}/);
+  assert.ok(expression, 'Remote key mapping must remain explicit');
+  const keys = new Map([...expression[1].matchAll(/(\d+)\s*:\s*'([^']+)'/g)]
+    .map(([, code, action]) => [Number(code), action]));
+  for (const [code, action] of [[37, 'left'], [38, 'up'], [39, 'right'], [40, 'down'], [13, 'ok'], [10009, 'back']]) {
+    assert.equal(keys.get(code), action, 'Missing expected navigation mapping for ' + code);
+  }
+  // These are not media controls provided by the launcher. Let the TV/streaming
+  // application retain their native function, including long-press behavior.
+  const reserved = [
+    447, 448, 449, 427, 428, 10073, 10190, 10252, 415, 19,
+    403, 404, 405, 406, 458, 10072
+  ];
+  for (const code of reserved) assert.equal(keys.has(code), false, 'Unexpected capture of system button ' + code);
+  assert.doesNotMatch(main + source, /\btvinputdevice\s*\.\s*registerKey(?:Batch)?\s*\(/i,
+    'Registering extra remote keys can disable their default Samsung actions');
+  assert.doesNotMatch(main + source, /addEventListener\s*\(\s*['"]tizenhwkey['"]/i,
+    'TV web apps must use documented keyboard input, not mobile hardware key events');
+});
