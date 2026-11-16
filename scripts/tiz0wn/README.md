@@ -17,6 +17,7 @@ Q60T firmware offsets apply to a Q80T.
 | Tizen 5.5 Home-key database routing | **Implemented as an unexecuted root-side trial** | `home-ctx.sh` |
 | Exact-value Home restoration | **Implemented with a saved baseline; untested on Q80T** | `home-ctx.sh restore` |
 | Debloat package lifecycle | **Use upstream's audited `pkgstate`, not an ad-hoc package remover** | tiz0wn `exploits/tiz0wn-root/payload/pkgstate` |
+| Bounded TV-side launcher command for a future boot hook | **Implemented, not installed or hardware-tested** | `boot-launch.sh` |
 | Root acquisition / boot persistence | **Not ported or executed** | tiz0wn's firmware-specific build-run and agent |
 | Home double-press/Back, TV power-on | **Not solved by upstream Tizen 5.5 trial** | tiz0wn `docs/home-key-menu-plan.md` |
 
@@ -114,7 +115,31 @@ capable of creating root access. A reboot before the initial restore is not
 part of this experiment. Even on the source Q60T, second-press toggle and
 Back behaviour were not solved: examine them before enabling persistence.
 
-## Step 5: Debloat — adopt the reversible upstream levers
+## Step 5: Wake and cold-boot startup
+
+Tiz0wn verified on its Q60T that the **already persistent root boot hook**
+can request `app_launcher -s <app-id>` after the Tizen web-app framework is
+available. Our `boot-launch.sh` is a separate, bounded one-shot component.
+It has a `check` (no launch) mode and a `start` mode with a maximum
+of three attempts through `timeout`. It does **not** create a boot hook.
+
+Only after root persistence and Home restoration are verified on the Q80T,
+stage this file into the root agent's controlled payload directory, and
+test a one-time launch while Samsung Home remains the default:
+
+```sh
+sh boot-launch.sh check YOUR10CHARID.DansTV
+sh boot-launch.sh start YOUR10CHARID.DansTV
+```
+
+Then independently integrate it with the firmware-specific *tiz0wn* boot
+worker (or a verified platform `app_onboot` row) and perform a supervised
+cold-boot test. Do not assume ordinary `on-boot` widget manifest
+attributes are honoured by Tizen 5.5. Never launch the web app ahead of the
+web-app service's readiness. Measure startup and keep a boot-level disable
+marker so recovery doesn't depend on the launcher UI.
+
+## Step 6: Debloat — adopt the reversible upstream levers
 
 Once root and **live inventory** are confirmed, use upstream `pkgstate` to
 **plan**, **disable**, read back and **enable** individual service apps. Avoid
@@ -151,6 +176,13 @@ sh pkgstate enable  org.tizen.acr-service-app
 Do not bulk-apply Q60T package lists to the Q80T. Disable progressively;
 record RAM/CPU and functional regressions after each candidate, then build
 a Q80T-specific allowlist with rollback entries.
+
+## Offline validation
+
+Run `python scripts/tiz0wn/check.py` (also included in `npm run win:check`).
+The test executes the actual apply/restore SQL in an isolated SQLite database
+and checks that unrelated Home-key and managed-app records are preserved.
+It does **not** prove compatibility with the Q80T registry or root context.
 
 ## Source references
 
