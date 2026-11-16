@@ -147,6 +147,63 @@ container/VM and dedicated credentials. The Q80T acts as an RDP
 client, so the PC/VM hosts the endpoint; checking port 3389 on the TV
 will not establish support.
 
+### Disposable Windows Remote PC / Shared Folder lab
+
+**Current owner measurements:** Docker Desktop + WSL 2 work; Windows' own
+SMB service already owns TCP/445 as PID 4; TCP/3389 is free; the TV has
+Remote Access → Remote PC and Shared Folder. Docker Desktop cannot
+publish a second SMB server to the **same** host port 445, so use Windows'
+existing SMB service with a new, restricted temporary share, and Docker
+only for a disposable XRDP desktop on 3389. The Docker and Windows service
+components share one LAN IP and a randomly generated temporary username/password.
+No permanent TV or firmware modification is performed.
+
+The source lives in `scripts/tiz0wn/lab/` and the Windows
+`rdp-lab.ps1` wrapper. The setup script has three explicit operations:
+
+```powershell
+# In Windows PowerShell **Run as Administrator**, from the repository root:
+.\scripts\tiz0wn\rdp-lab.ps1 -Action Setup
+.\scripts\tiz0wn\rdp-lab.ps1 -Action Status
+# Once finished, or after a partially failed Setup:
+.\scripts\tiz0wn\rdp-lab.ps1 -Action Cleanup
+```
+
+`Setup` automatically selects the PC's outgoing LAN address toward the
+configured Q80T, generates a 16-character password, saves credentials in
+ignored `.local/tiz0wn-lab/lab.env`, creates local Windows user
+`danstvprobe`, a restricted `DansTVProbe` SMB share, firewall
+allow rules restricted to the TV IP, then builds/starts an XFCE/XRDP
+container on `<PC-IP>:3389`. It **does not disable Windows SMB**,
+alter any existing Windows share, or enable Windows RDP. The rule
+allowlisting the TV does not remove other existing firewall allow rules:
+ensure this is a trusted LAN, not an exposed/public network. There is a
+normal `readme.txt` inside the share for connectivity confirmation.
+
+`Status` checks the disposable user/share, container, and PC-facing
+ports. `Cleanup` requires a matching local ownership marker before
+removing the service, temporary Windows account/share, the two named
+firewall rules and generated credential file. It deliberately retains
+the local test folder for inspection. If Setup fails, run Cleanup;
+do not repeatedly overwrite or disable system services.
+
+On TV, enter the PC LAN IP printed by Setup in **Remote PC**.
+Use the same `danstvprobe` username and password stored locally
+(the script explains how to display it); enable **Remember credentials /
+Shared Folder** when available. Connect to the disposable desktop,
+accept its local self-signed certificate only for the test, and
+open **Shared Folder** from the in-session toolbar. The temporary share
+should be `\\<PC-IP>\DansTVProbe`. Do **not** enter an exploit string
+during this first connectivity check. Check the resulting on-TV UI
+rather than assuming a successful Docker health check proves the TV path.
+
+The next (separate) stage is one bounded volatile UID-0 test following
+tiz0wn's `docs/DISCLOSURE.md` and `docs/trigger-grammar.md` research,
+*not* the permanent firmware patch. An exact local Windows/Docker
+environment can be tested on its own before changing the TV-side
+credential field. Share credentials privately; do not commit them or paste
+them into a public chat.
+
 ## Step 2: Root route — separate, firmware-gated stage
 
 1. Clone tiz0wn into ignored `.local/tiz0wn-upstream` or a separate development
