@@ -43,10 +43,63 @@ The owner should run `uid-probe.ps1 -Action Restore` if its
 lab account passwords; it does not delete the lab, which remains
 available for controlled testing. Do not commit any credential files.
 
-A bounded **read-only snapshot receiver prototype** was added as
-`root-bridge.py`. It is not yet wired to an end-to-end Windows launcher,
-and it has **not** been executed on the TV. Do not imply that it has
-established a working general root command channel.
+A bounded **read-only snapshot transport** is implemented in
+`root-bridge.py` with `root-bridge.ps1` for Windows orchestration. Local
+HTTP and Linux Bash/curl round trips pass; it has **not** been executed
+on the TV. It is not a general root shell. See the trial below and the
+current [handover](../../docs/q80t-root-handover.md).
+
+### Next hardware trial: one bounded snapshot
+
+Use an Administrator PowerShell window from the repository root. Prepare
+restarts only the disposable XRDP container and rotates only its dedicated
+lab account credentials. The recorded exact model/firmware preflight and
+lab ownership must match; addresses are read from private configuration.
+
+```powershell
+.\scripts\tiz0wn\root-bridge.ps1 -Action Prepare
+```
+
+Then run `-Action Listen` in that window. While it listens, focus the TV's
+Remote PC password field. From a second window, use the already paired
+`python scripts/tiz0wn/paste-password.py send`. This sends only the prepared
+password, without Enter. Confirm acceptance on the TV, reconnect to the
+disposable desktop and open Samsung Shared Folder once. If that password
+field rejects remote text entry, enter the password from the private
+`lab.env` locally; do not paste it into chat.
+
+The trigger fetches a fixed survey, sources it in the proven shell context,
+captures stdout and stderr together and POSTs the report with an explicit
+EUID and survey exit status. The downloaded script and temporary report
+are removed on the normal completion path. An interrupted execution may
+leave these files in `/tmp`; no permanent TV settings are changed. Optional
+inventory queries can fail without failing the whole survey: inspect the
+report before asserting any individual capability.
+
+The receiver allows only the configured TV IP and fresh 96-bit session
+token, one download and one validated result, with a five-minute deadline,
+three-second socket timeout and 512 KiB report limit. A non-root, incomplete
+or failed report is rejected. Existing reports cannot be overwritten.
+Reports and receipt metadata remain in ignored `.local/tiz0wn-lab/` and
+their contents are not printed. This is trusted-LAN HTTP with a bearer
+token, without encryption or server identity protection; never expose it
+outside the trusted lab network.
+
+Listen exits nonzero without a validated report and always invokes Restore
+after the receiver exits. Restore removes the callback firewall rule,
+restores the previous dedicated account/XRDP credentials, and removes the
+session token file. It retains the backup until both credential restores
+succeed. After Prepare without Listen, interruption or failure, run:
+
+```powershell
+.\scripts\tiz0wn\root-bridge.ps1 -Action Restore
+```
+
+Restore the TV's saved Remote PC password to the ordinary lab password as
+well. The host receiver exits on result/timeout; Ctrl+C stops it early.
+Repeatability, the TV credential restoration and physical Shared Folder
+flow still require owner observation. Do not proceed to Home writes until
+the actual Q80T report and independent recovery path are verified.
 
 ### Remaining acceptance gates
 
@@ -481,6 +534,11 @@ Run `python scripts/tiz0wn/check.py` (also included in `npm run win:check`).
 The test executes the actual apply/restore SQL in an isolated SQLite database
 and checks that unrelated Home-key and managed-app records are preserved.
 It does **not** prove compatibility with the Q80T registry or root context.
+
+Run `python -B scripts/tiz0wn/test-root-bridge.py` for local HTTP transport
+and password/session checks. The additional full Bash/curl integration
+test runs only in a disposable Linux root container with curl installed.
+Never run that test as root on a TV.
 
 ## Source references
 

@@ -135,10 +135,15 @@ switch ($Action) {
         Get-NetFirewallRule -Name $fwSMB -ErrorAction SilentlyContinue | Remove-NetFirewallRule -ErrorAction Stop
         Get-NetFirewallRule -Name $fwRDP -ErrorAction SilentlyContinue | Remove-NetFirewallRule -ErrorAction Stop
         Get-NetFirewallRule -Name 'DansTVProbe-Temporary-UID-HTTP' -ErrorAction SilentlyContinue | Remove-NetFirewallRule -ErrorAction Stop
+        Get-NetFirewallRule -Name 'DansTVProbe-Temporary-Snapshot-HTTP' -ErrorAction SilentlyContinue | Remove-NetFirewallRule -ErrorAction Stop
         if (Current-Share) { Remove-SmbShare -Name $shareName -Force }
         if (Current-User) { Remove-LocalUser -Name $name }
         $uidBackup = Join-Path $lab 'lab.env.before-uid'
         if (Test-Path $uidBackup) { Remove-Item -LiteralPath $uidBackup -Force }
+        foreach ($snapshotFile in @('lab.env.before-snapshot', 'snapshot-session.json')) {
+            $snapshotPath = Join-Path $lab $snapshotFile
+            if (Test-Path -LiteralPath $snapshotPath) { Remove-Item -LiteralPath $snapshotPath -Force }
+        }
         if (Test-Path $envFile) { Remove-Item -LiteralPath $envFile -Force }
         if (Test-Path $marker) { Remove-Item -LiteralPath $marker -Force }
         Write-Output 'Temporary Windows user, SMB share, lab firewall rules and credentials removed. Docker lab stopped.'

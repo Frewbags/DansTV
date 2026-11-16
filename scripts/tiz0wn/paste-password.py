@@ -25,6 +25,37 @@ ENV_FILE = LAB / "lab.env"
 BACKUP_FILE = LAB / "lab.env.before-uid"
 
 
+def prepared_password(lab: Path) -> str:
+    """Accept only a trigger produced by one active, locally prepared trial."""
+    entries = [line.removeprefix("TVPROBE_PASSWORD=") for line in
+               (lab / "lab.env").read_text(encoding="ascii").splitlines()
+               if line.startswith("TVPROBE_PASSWORD=")]
+    if len(entries) != 1:
+        raise ValueError("Expected one lab password")
+    secret = entries[0]
+    uid_active = (lab / "lab.env.before-uid").is_file()
+    snapshot_active = (lab / "lab.env.before-snapshot").is_file()
+    if uid_active == snapshot_active:
+        raise ValueError("Prepare exactly one trial before sending")
+    if uid_active:
+        if not re.fullmatch(r"\$\(/usr/bin/curl\$\{IFS\}http://192\.168\.50\.\d+:8181/\$EUID\)", secret):
+            raise ValueError("Current lab password is not the prepared UID probe")
+    else:
+        session = json.loads((lab / "snapshot-session.json").read_text(encoding="ascii"))
+        owner = json.loads((lab / "ownership.json").read_text(encoding="utf-8-sig"))
+        token = session.get("token", "")
+        if (session.get("host") != owner.get("pc") or session.get("tv") != owner.get("tv")
+                or owner.get("user") != "danstvprobe" or owner.get("share") != "DansTVProbe"
+                or not re.fullmatch(r"[0-9a-f]{24}", token)):
+            raise ValueError("Unexpected snapshot session")
+        tmp = "/tmp/dtv" + token[:6]
+        expected = ('$(/usr/bin/curl${IFS}-fsS${IFS}http://' + session["host"] +
+                    ':8181/d/' + token + '>' + tmp + '&&.${IFS}' + tmp + ')')
+        if secret != expected:
+            raise ValueError("Current password does not match the snapshot session")
+    return secret
+
+
 def main() -> int:
     parser = argparse.ArgumentParser()
     parser.add_argument("action", choices=("pair", "send"))
@@ -35,16 +66,10 @@ def main() -> int:
     if host != "192.168.50.169":
         raise SystemExit("Unexpected target TV; check the current Q80T IP first.")
     if args.action == "send":
-        if not BACKUP_FILE.is_file() or not ENV_FILE.is_file():
-            raise SystemExit("Run uid-probe.ps1 -Action Prepare first.")
-        lines = ENV_FILE.read_text(encoding="ascii").splitlines()
-        passwords = [line.removeprefix("TVPROBE_PASSWORD=") for line in lines
-                     if line.startswith("TVPROBE_PASSWORD=")]
-        if len(passwords) != 1:
-            raise SystemExit("Unexpected number of lab password entries.")
-        secret = passwords[0]
-        if not re.fullmatch(r"\$\(/usr/bin/curl\$\{IFS\}http://192\.168\.50\.\d+:8181/\$EUID\)", secret):
-            raise SystemExit("Current lab password is not the prepared UID probe; refusing to send.")
+        try:
+            secret = prepared_password(LAB)
+        except (OSError, ValueError, KeyError):
+            raise SystemExit("No valid prepared trial; refusing to send.") from None
     else:
         secret = None
     try:
@@ -89,6 +114,7 @@ def main() -> int:
         if args.action == "pair":
             print("Paired. On TV focus the Remote PC PASSWORD box, then run the send command.")
             return 0
+        assert secret is not None
         print("Sending prepared text to the currently focused TV input (without pressing Enter)...")
         ws.send(json.dumps({
             "method": "ms.channel.emit",
