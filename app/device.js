@@ -80,7 +80,7 @@
       }, function (err) { finish(failure(err)); });
     } catch (err) { finish(failure(err)); }
   }
-  function setSource(port, done) {
+  function setSource(port, done, manual) {
     cancelSource();
     var tvw = window.tizen && window.tizen.tvwindow, app = api(), finished = false;
     if (typeof port !== 'number' || !isFinite(port) || port < 0 || Math.floor(port) !== port) { done({ message: 'This HDMI input is not available.' }); return; }
@@ -96,9 +96,11 @@
     sourceCancel = cancel;
     sources(function (err, list) {
       if (finished) return;
-      if (err) { finish(err); return; }
+      if (err && !manual) { finish(err); return; }
       var input = null;
-      list.some(function (item) { if (item.number === port) { input = item; return true; } return false; });
+      (list || []).some(function (item) { if (item.number === port) { input = item; return true; } return false; });
+      // User-selected mapping: try the documented VideoSourceInfo fields even when system discovery failed.
+      if (!input && manual && port <= 4) input = { number: port, name: 'HDMI ' + port, connected: false, source: { type: 'HDMI', number: port } };
       if (!input) { finish({ message: 'This HDMI input is no longer available.' }); return; }
       try {
         tvw.setSource(input.source, function (selected) {
