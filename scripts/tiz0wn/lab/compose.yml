@@ -1,0 +1,12 @@
+# RDP on the Windows PC. SMB remains the native Windows service on 445.
+# Host-IP/credentials come from an ignored local file supplied by --env-file.
+services:
+  danstv-rdp:
+    build: .
+    container_name: danstv-remote-pc-lab
+    restart: "no"
+    init: true
+    ports:
+      - "${LAB_HOST_IP:?Set LAB_HOST_IP}:3389:3389"
+    env_file:
+      - ../../../.local/tiz0wn-lab/lab.env
