@@ -20,7 +20,7 @@
     "check:performance": "node scripts/check-performance.mjs",
     "check:offline": "python scripts/check-offline.py",
     "win:preview": "python scripts/preview.py --public-fonts",
-    "win:check": "npm run lint && python scripts/check.py && npm run check:device && npm run check:offline"
+    "win:check": "npm run lint && python scripts/check.py && npm run check:device && npm run check:offline && python scripts/tiz0wn/check.py"
   },
   "devDependencies": {
     "eslint": "10.13.0",
