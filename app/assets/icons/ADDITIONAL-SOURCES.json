@@ -16,5 +16,35 @@
     "source": "https://github.com/simple-icons/simple-icons/blob/develop/icons/tubi.svg",
     "licence": "CC0-1.0",
     "note": "Shape unchanged; white fill for launcher."
+  },
+  {
+    "icon": "jellyfin",
+    "source": "https://github.com/simple-icons/simple-icons/blob/develop/icons/jellyfin.svg",
+    "licence": "CC0-1.0",
+    "note": "Jellyfin brand symbol; fixed SVG mask; Jellyfin name/logo remain project marks."
+  },
+  {
+    "icon": "kayo",
+    "source": "https://github.com/elax46/custom-brand-icons/blob/main/icon-svg/kayo.svg",
+    "licence": "CC BY-NC-SA 4.0",
+    "note": "Community-traced Kayo logo silhouette; white mask, cropped viewBox; NOT an authorised official distribution."
+  },
+  {
+    "icon": "7plus",
+    "source": "https://github.com/elax46/custom-brand-icons/blob/2025.5.0/icon-svg/7plus-tv.svg",
+    "licence": "CC BY-NC-SA 4.0",
+    "note": "Community-traced 7plus logo silhouette; white mask, cropped viewBox; NOT an authorised official distribution."
+  },
+  {
+    "icon": "9now",
+    "source": "https://github.com/elax46/custom-brand-icons/blob/2025.5.0/icon-svg/9-now.svg",
+    "licence": "CC BY-NC-SA 4.0",
+    "note": "Community-traced 9Now wordmark; white mask, cropped viewBox; NOT an authorised official distribution."
+  },
+  {
+    "icon": "10play",
+    "source": "https://github.com/elax46/custom-brand-icons/blob/2025.5.0/icon-svg/10-play.svg",
+    "licence": "CC BY-NC-SA 4.0",
+    "note": "Historical 10 Play mark; 2025 rebranded 10 service may use different official app icon; white mask, cropped viewBox; NOT an authorised official distribution."
   }
 ]
