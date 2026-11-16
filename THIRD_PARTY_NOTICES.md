@@ -38,3 +38,11 @@ Photographers retain their rights. Wallpapers, thumbnails, panel backgrounds and
 Development dependencies retain the licences in their npm packages. They are not copied into the TV JavaScript runtime.
 
 `npm run export:public` excludes private fonts and includes this notice and the root MIT licence. Preserve the included font and icon licence texts. Review [public release preparation](docs/public-release.md) before publishing a repository or download.
+
+## Optional Q80T Tizen 5.5 integration tooling
+
+| Material | Provenance and terms |
+| --- | --- |
+| `scripts/tiz0wn/home-ctx.sh`, research workflow and stage documentation | Adapted from [sebastianspicker/tiz0wn](https://github.com/sebastianspicker/tiz0wn), Copyright © 2026 Sebastian J. Spicker. MIT License; retained in [`scripts/tiz0wn/LICENSE`](scripts/tiz0wn/LICENSE). The CPU/RAM snapshot and Windows preflight are new companion tooling. Upstream works only on verified firmware; no Samsung firmware, root payload or root executable is bundled. |
+
+The optional tools are not included in the TV widget or public installer and make no system changes unless independently staged and invoked on the device. The upstream source license does not cover proprietary Samsung firmware.
