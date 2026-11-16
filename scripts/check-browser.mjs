@@ -491,6 +491,21 @@ try {
     });
     check('Remote right scrolls one complete tile at a time', moved.visible === 6 && moved.focus === 'home.app.sbs', moved);
   });
+  await run('TV-provided icons take precedence over bundled brand fallback', async () => {
+    await page({ catalog: CATALOG.map(a => a.id === 'org.tizen.netflix-app'
+      ? { ...a, iconPath: '/home/assets/icons/netflix.svg' } : a) });
+    await library();
+    await scene('home');
+    await current.waitForFunction(() => {
+      const icon = document.querySelector('[data-action="home.app.netflix"] img[data-native-icon]');
+      return icon && icon.complete && icon.naturalWidth > 0;
+    });
+    check('Installed icon is displayed when Tizen supplies it',
+      await current.evaluate(() => {
+        const el = document.querySelector('[data-action="home.app.netflix"] .native-icon');
+        return !!(el && el.classList.contains('has-native-icon'));
+      }));
+  });
   await run('Real catalogue and native launch boundary', async () => {
     await page(); await library();
     const names = await current.locator('[data-action^="apps.open."] .label').allTextContents();
