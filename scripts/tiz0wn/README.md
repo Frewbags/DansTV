@@ -61,6 +61,28 @@ Tizen 5.5, ARMv7 and `intershell_support=disabled`. They do **not** prove
 root access or tell us which rootfs partition, vulnerability path or block
 offset the Q80T uses.
 
+### Offline firmware file inspection (optional)
+
+Samsung's **Australian** Q80T support page currently lists a
+`T-NKMUABC.zip` package at 2730.6; the owner-confirmed TV runs 2743.0.
+Other official Samsung regional support pages list the NKMUABC 2743.0
+archive. For source analysis, obtain a **matching 2743.0** firmware archive
+through an official Samsung support page, retaining the download provenance.
+**Do not install an older release or flash a foreign-region ZIP** as part of
+this work. The ZIP is approximately 1.7 GB.
+
+Once the *official* `T-NKMUABC.zip` archive is already saved locally:
+
+```powershell
+python scripts/tiz0wn/firmware-inventory.py "C:\\path\\to\\T-NKMUABC.zip" --sha256
+```
+
+This inspects the ZIP directory and optionally computes its SHA-256.
+`--check-contents` does a full (slower) CRC verification. No network access,
+decryption, extraction, exploit or TV-side operation is performed. Archive
+filenames alone do **not** establish the embedded release version or root
+patch compatibility; any later firmware parser must verify that separately.
+
 ## Step 2: Root route — separate, firmware-gated stage
 
 1. Clone tiz0wn into ignored `.local/tiz0wn-upstream` or a separate development
