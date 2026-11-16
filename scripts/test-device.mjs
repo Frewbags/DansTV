@@ -229,3 +229,28 @@ test('missing and ambiguous named apps fail rather than launching a wrong ID', (
   assert.match(ambiguousError.message, /Multiple matching/);
   assert.equal(ambiguous.launches.length, 0);
 });
+
+test('user-mapped console can switch source without a discovery result', () => {
+  const h = harness(), results = [];
+  h.device.setSource(3, (error, input) => results.push({ error, input }), true);
+  h.sourceRequests[0].fail({ name: 'SecurityError' });
+  assert.equal(h.changes.length, 1);
+  assert.equal(h.changes[0].source.type, 'HDMI');
+  assert.equal(h.changes[0].source.number, 3);
+  h.changes[0].ok({ type: 'HDMI', number: 3 });
+  assert.equal(h.launches.length, 1);
+  assert.equal(h.launches[0].id, 'org.tizen.tv-viewer');
+  h.launches[0].ok();
+  assert.equal(results[0].error, null);
+  assert.equal(results[0].input.number, 3);
+});
+
+test('unmapped source requests never silently choose an HDMI port', () => {
+  const h = harness(), result = [];
+  h.device.setSource(3, error => result.push(error));
+  h.sourceRequests[0].fail({ name: 'SecurityError' });
+  assert.equal(h.changes.length, 0);
+  assert.equal(h.launches.length, 0);
+  assert.equal(result.length, 1);
+  assert.ok(result[0]);
+});
