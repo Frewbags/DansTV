@@ -31,12 +31,14 @@ $sdk = (Resolve-Path -LiteralPath $sdkPath -ErrorAction Stop).Path
 $tizen = Join-Path $sdk 'tools\ide\bin\tizen.bat'
 $sdb = Join-Path $sdk 'tools\sdb.exe'
 
-function Invoke-Python([string[]]$Arguments) {
+function Invoke-Python {
+    param([string[]]$Arguments = @())
     & python $widgetTool @Arguments
     if ($LASTEXITCODE -ne 0) { throw 'Owner widget validation failed.' }
 }
 
-function Invoke-Sdb([string[]]$Arguments) {
+function Invoke-Sdb {
+    param([string[]]$Arguments)
     $output = (& $sdb @Arguments 2>&1 | Out-String)
     if ($LASTEXITCODE -ne 0) { throw 'SDB command failed; inspect the TV developer connection.' }
     return $output
@@ -48,7 +50,7 @@ if ($Action -eq 'Sign') {
     if (-not (Test-Path -LiteralPath $tizen -PathType Leaf)) {
         throw 'Tizen Studio CLI missing under tools\ide\bin. See docs/q80t-setup.md.'
     }
-    Invoke-Python @()
+    Invoke-Python
     $folder = Join-Path $root ('dist\signed-q80t-' + [guid]::NewGuid().ToString('N'))
     New-Item -ItemType Directory -Path $folder | Out-Null
 
@@ -60,7 +62,7 @@ if ($Action -eq 'Sign') {
     if (-not (Test-Path -LiteralPath $staged -PathType Leaf)) {
         throw 'Tizen CLI did not create the expected signed widget.'
     }
-    Invoke-Python @('--verify', $staged)
+    Invoke-Python -Arguments @('--verify', $staged)
     Copy-Item -LiteralPath $staged -Destination $signed -Force
     Write-Output 'Signed owner widget prepared: dist\DansTV.wgt'
     Write-Output 'Nothing was installed or changed on the TV.'
@@ -85,26 +87,26 @@ if ($Action -eq 'Install') {
     if (-not (Test-Path -LiteralPath $signed -PathType Leaf)) {
         throw 'Sign your widget first: .\scripts\q80t-windows.ps1 Sign'
     }
-    Invoke-Python @('--verify', $signed)
+    Invoke-Python -Arguments @('--verify', $signed)
 } else {
     # Validate custom identity without writing files or contacting the TV.
-    Invoke-Python @('--check')
+    Invoke-Python -Arguments @('--check')
 }
 
 $serial = "$($parsed.ToString()):26101"
-$connected = Invoke-Sdb @('connect', $serial)
+$connected = Invoke-Sdb -Arguments @('connect', $serial)
 if ($connected -notmatch 'connected to|already connected') {
     throw 'SDB connection was not confirmed. Check TV Developer Mode and the Host PC IP.'
 }
 
 switch ($Action) {
     'Info' {
-        $capabilities = Invoke-Sdb @('-s', $serial, 'capability')
+        $capabilities = Invoke-Sdb -Arguments @('-s', $serial, 'capability')
         Write-Output $capabilities
         Write-Output 'Read-only capability query complete. No TV settings changed.'
     }
     'Launch' {
-        $result = Invoke-Sdb @('-s', $serial, 'shell', '0', 'execute', [string]$config.app_id)
+        $result = Invoke-Sdb -Arguments @('-s', $serial, 'shell', '0', 'execute', [string]$config.app_id)
         if ($result -notmatch 'successfully launched') {
             throw 'The TV did not confirm launch; verify on the screen.'
         }
@@ -113,15 +115,15 @@ switch ($Action) {
     'Install' {
         $hash = (Get-FileHash -LiteralPath $signed -Algorithm SHA256).Hash.Substring(0, 12)
         $remote = '/home/owner/share/tmp/sdk_tools/DansTV-' + $hash + '-' + [DateTime]::UtcNow.Ticks + '.wgt'
-        $pushed = Invoke-Sdb @('-s', $serial, 'push', $signed, $remote)
+        $pushed = Invoke-Sdb -Arguments @('-s', $serial, 'push', $signed, $remote)
         if ($pushed -notmatch '1 file\(s\) pushed' -or $pushed -match 'failed') {
             throw 'Widget upload was not confirmed.'
         }
-        $installed = Invoke-Sdb @('-s', $serial, 'shell', '0', 'vd_appinstall', [string]$config.app_id, $remote)
+        $installed = Invoke-Sdb -Arguments @('-s', $serial, 'shell', '0', 'vd_appinstall', [string]$config.app_id, $remote)
         if ($installed -notmatch 'install completed' -or $installed -match 'install failed') {
             throw 'Installation was not confirmed; do not assume it succeeded.'
         }
-        $apps = Invoke-Sdb @('-s', $serial, 'shell', '0', 'applist')
+        $apps = Invoke-Sdb -Arguments @('-s', $serial, 'shell', '0', 'applist')
         if (-not $apps.Contains([string]$config.app_id)) {
             throw 'DansTV was not found in the installed applications.'
         }
