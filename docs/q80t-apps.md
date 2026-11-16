@@ -25,3 +25,9 @@ Jellyfin, Kayo, 7plus, 9Now and 10 are resolved from the installed Tizen applica
 To see these defaults on an existing preview with a deliberately customised Home layout, use the app editor. Do not blindly clear all site data, because that also discards saved preferences. A previously saved unmodified stock default will migrate automatically. After updating the branch, restart the preview process and refresh the page.
 
 Remote OK/Back and focus navigation are left intact. Source selection and TV installation remain separately verified steps.
+
+## Six-wide dock and branded icons
+
+The dock shows **six complete app tiles** simultaneously at 1920×1080, scaled uniformly at 1280×720. The remaining apps are reached by left/right remote navigation, scrolling by whole tiles rather than partially faded neighbours. The 14-app maximum is unchanged.
+
+The existing streaming marks remain local SVG silhouettes. New bundled Jellyfin, Kayo, 7plus, 9Now and historical 10 Play marks are credited in `app/assets/icons/ADDITIONAL-SOURCES.json`. The Australian community-source marks are **CC BY-NC-SA 4.0**, separately licensed from the MIT code; see the icon licence file and THIRD_PARTY_NOTICES.md. The 10 Play historical fallback may differ from the current 10 app branding. If Tizen supplies an installed app's `iconPath` after discovery, DansTV prefers that authentic installed icon instead. Live TV uses an original generic pictogram, not Samsung artwork. No network request is made to fetch icons during runtime.
