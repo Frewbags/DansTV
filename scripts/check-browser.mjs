@@ -414,7 +414,7 @@ try {
         const scale = document.getElementById('stage').getBoundingClientRect().width / 1920;
         return elements.map(e => (e.querySelector('.ico').getBoundingClientRect().left - e.querySelector('.settings-group-copy').getBoundingClientRect().right) / scale);
       });
-      check('Settings group arrows stay separate from their copy at ' + width, groups.length === 6 && groups.every(gap => gap >= 31.5), groups);
+      check('Settings group arrows stay separate from their copy at ' + width, groups.length === 7 && groups.every(gap => gap >= 31.5), groups);
       await wallpaper();
       const caption = await current.locator('.wallpaper-preview-name').evaluate(e => {
         const scale = document.getElementById('stage').getBoundingClientRect().width / 1920;
@@ -515,8 +515,7 @@ try {
     await nav('back');
     await group('consoles');
     await act('console.select.switch');
-    check('Switch mapping opens five available input choices', ['0','1','2','3','4'].every(p =>
-      true) && (await current.locator('[data-action^="console.map.switch."]').count()) === 5);
+    check('Switch mapping opens five available input choices', (await current.locator('[data-action^="console.map.switch."]').count()) === 5);
     await act('console.map.switch.2');
     const mapped = await stored();
     check('Explicit port 2 assignment persists locally', mapped.consolePorts.switch === 2);
