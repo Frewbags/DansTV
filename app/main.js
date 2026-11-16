@@ -4,14 +4,14 @@
 
   /* ---------- Bundled data ---------- */
   var ASSETS = 'assets/', ICONS = ASSETS + 'icons/', WP = ASSETS + 'wallpapers/';
-  var CAP = 14, SCRIM_Y = 560;
+  var CAP = 16, SCRIM_Y = 560;
   var DOCK_MODES = { both: { tw: 288, th: 200, pitch: 296 }, text: { tw: 288, th: 104, pitch: 296 }, icons: { tw: 176, th: 144, pitch: 184 } };
   var GRID_ROW = 240, GRID_COL = 344, COLS = 5;
   var ED_ROW = 80, ED_SEP = 56, ED_VIEW = 752;
   var PH_TOP = 220, PH_PITCH = 128, PH_FULL = 5, PH_HEIGHT = 944, PH_COMPACT_TOP = 144, PH_COMPACT_PITCH = 88, PH_COMPACT_VISIBLE = 9;
   var WALL_VISIBLE = 6, WALL_ROW = 92, WALL_DELAY = 200;
   var KEYS = { 37: 'left', 38: 'up', 39: 'right', 40: 'down', 13: 'ok', 27: 'back', 8: 'back', 10009: 'back', 461: 'back' };
-  var FULL = 'Home holds fourteen apps. Remove one first.', LAST = 'Home needs one app';
+  var FULL = 'Home holds sixteen apps. Remove one first.', LAST = 'Home needs one app';
 
   var PRIMARY_APPS = [
     { id: 'stremio', name: 'Stremio', mark: true, appId: 'IkWsFHtOY9.Stremio' },
@@ -28,13 +28,18 @@
     { id: 'kayo', name: 'Kayo', mark: true, appId: '' },
     { id: '7plus', name: '7plus', mark: true, appId: '' },
     { id: '9now', name: '9Now', mark: true, appId: '' },
-    { id: '10play', name: '10', mark: true, appId: '' }
+    { id: '10play', name: '10', mark: true, appId: '' },
+    { id: 'switch', name: 'Nintendo Switch', mark: true, appId: '' },
+    { id: 'switch2', name: 'Nintendo Switch 2', mark: true, appId: '' },
+    { id: 'ps4', name: 'PlayStation 4', mark: true, appId: '' }
   ];
   var PRIMARY = PRIMARY_APPS.map(function (a) { return a.id; }), APPS = PRIMARY_APPS.slice(), ALPHA = [];
   /* Preserve optional legacy apps; do not force them onto Home. */
   var LEGACY_DEFAULT_HOME = ['stremio', 'netflix', 'disneyplus', 'youtube', 'appletv', 'primevideo', 'abciview', 'sbs', 'applemusic'];
-  var DEFAULT_HOME = ['livetv', 'netflix', 'primevideo', 'youtube', 'jellyfin', 'kayo', 'abciview', 'sbs', '7plus', '9now', '10play', 'appletv', 'applemusic'];
-  var LOCAL_MARKS = ['stremio', 'netflix', 'disneyplus', 'youtube', 'appletv', 'primevideo', 'abciview', 'sbs', 'applemusic', 'livetv', 'jellyfin', 'kayo', '7plus', '9now', '10play', 'spotify', 'tubi', 'hbomax'];
+  var PREVIOUS_DANSTV_HOME = ['livetv', 'netflix', 'primevideo', 'youtube', 'jellyfin', 'kayo', 'abciview', 'sbs', '7plus', '9now', '10play', 'appletv', 'applemusic'];
+  var CONSOLES = ['switch', 'switch2', 'ps4'];
+  var DEFAULT_HOME = PREVIOUS_DANSTV_HOME.concat(CONSOLES);
+  var LOCAL_MARKS = ['stremio', 'netflix', 'disneyplus', 'youtube', 'appletv', 'primevideo', 'abciview', 'sbs', 'applemusic', 'livetv', 'jellyfin', 'kayo', '7plus', '9now', '10play', 'switch', 'switch2', 'ps4', 'spotify', 'tubi', 'hbomax'];
   var WALLS = window.CleanFrameWallpapers || [{ id: 'misty', name: 'Misty coast', tone: 'light', ut: { tr: 'mist', br: 'mist' }, frostVeil: .20 }];
   var ADAPTIVE_INK = window.CleanFrameAdaptiveInk || {};
   WALLS.forEach(function (w) { w.ut = w.ut || { tr: 'light', br: 'light' }; w.frostVeil = w.frostVeil || .12; });
@@ -348,7 +353,7 @@
       if (!app(id) && id.indexOf('.') > 0) APPS.push({ id: id, appId: id, name: id.split('.').pop(), mark: false });
       if (app(id)) h.push(id);
     });
-    if (!h.length || same(h, LEGACY_DEFAULT_HOME)) h = DEFAULT_HOME.slice();
+    if (!h.length || same(h, LEGACY_DEFAULT_HOME) || same(h, PREVIOUS_DANSTV_HOME)) h = DEFAULT_HOME.slice();
     (Array.isArray(s.recent) ? s.recent : []).forEach(function (id) { if (safeId(id) && app(id) && h.indexOf(id) < 0 && recent.indexOf(id) < 0 && recent.length < 5) recent.push(id); });
     return {
       bg: pick(modern.bg, LOOK_VALUES.bg, legacyList ? 'dark' : 'photo'), layout: pick(modern.layout, LOOK_VALUES.layout, legacyList ? 'list' : 'dock'),
@@ -356,13 +361,20 @@
       focus: pick(modern.focus, LOOK_VALUES.focus, legacyList ? 'type' : 'glass'), material: pick(modern.material, LOOK_VALUES.material, 'soft'),
       font: pick(modern.font, LOOK_VALUES.font, 'manrope'), wall: wall(modern.wall || s.wallpaper) ? modern.wall || s.wallpaper : WALLS[0].id,
       home: h, recent: recent, lastApp: h.indexOf(s.lastApp) >= 0 ? s.lastApp : h[0],
-      mode: pick(s.mode, MODES.map(function (m) { return m.id; }), 'fixed')
+      mode: pick(s.mode, MODES.map(function (m) { return m.id; }), 'fixed'),
+      consolePorts: consolePorts(s.consolePorts)
     };
+  }
+  function consolePorts(saved) {
+    var out = {}, data = saved && typeof saved === 'object' ? saved : {};
+    CONSOLES.forEach(function (id) { var p = data[id]; out[id] = typeof p === 'number' && p >= 1 && p <= 4 && p === Math.floor(p) ? p : null; });
+    return out;
   }
   function serialise(c) {
     var out = {};
     Object.keys(c).forEach(function (key) { out[key] = c[key]; });
     out.version = 2; out.look = lookOf(c); out.dock = c.home.slice(); out.wallpaper = c.wall;
+    out.consolePorts = consolePorts(c.consolePorts);
     out.theme = c.layout === 'list' ? 'list' : 'shore';
     out.appRecords = [];
     c.home.concat(c.recent).forEach(function (key) {
@@ -381,7 +393,7 @@
   }
   function clearSession() { S.undo = []; S.removedAt = {}; S.note = null; S.err = null; }
   function begin() { S.note = null; }
-  function next(home, recent) { var c = lookOf(S.c); c.home = home; c.recent = recent; c.lastApp = S.c.lastApp; c.mode = S.c.mode; return c; }
+  function next(home, recent) { var c = lookOf(S.c); c.home = home; c.recent = recent; c.lastApp = S.c.lastApp; c.mode = S.c.mode; c.consolePorts = consolePorts(S.c.consolePorts); return c; }
   function snap() { return { home: S.c.home.slice(), recent: S.c.recent.slice() }; }
   function pushRecent(list, id) { return [id].concat(without(list, id)).slice(0, 5); }
   function write(c, label) {
@@ -472,7 +484,12 @@
     if (S.c.home.indexOf(id) >= 0) { c = next(S.c.home.slice(), S.c.recent.slice()); c.lastApp = id; write(c, 'Last app'); }
     S.press = id; S.lastLaunch = a.name;
     perform(a.name, function (done) {
-      if (id === 'livetv') FrameDevice.liveTV(done);
+      if (CONSOLES.indexOf(id) >= 0) {
+        var port = S.c.consolePorts && S.c.consolePorts[id];
+        if (!port) { done({ message: 'Assign this console to an HDMI port in Settings → Consoles.' }); return; }
+        FrameDevice.setSource(port, done, true);
+      }
+      else if (id === 'livetv') FrameDevice.liveTV(done);
       else if (['jellyfin', 'kayo', '7plus', '9now', '10play'].indexOf(id) >= 0) FrameDevice.launchNamed(id, done);
       else FrameDevice.launchApp(a.appId, done);
     });
@@ -725,7 +742,7 @@
   /* ---------- B: two-zone Home editor ---------- */
   function otherGroups() {
     var rec = S.c.recent.filter(function (id) { return !onHome(id) && app(id); });
-    return { recent: rec, rest: ALPHA.filter(function (id) { return !onHome(id) && rec.indexOf(id) < 0; }) };
+    return { recent: rec, rest: ALPHA.concat(CONSOLES).filter(function (id, i, list) { return !onHome(id) && rec.indexOf(id) < 0 && list.indexOf(id) === i; }) };
   }
   function otherList() { var o = otherGroups(); return o.recent.concat(o.rest); }
   function editorCut() { return 5; }
@@ -835,6 +852,7 @@
       { id: 'typography', label: 'Typography', value: FONTS[S.c.font].name },
       { id: 'focus', label: 'Focus', value: VALUE_NAMES[S.c.focus] + (materialApplies() ? ', ' + VALUE_NAMES[S.c.material] : '') },
       { id: 'editor', label: 'Apps on Home', value: n + (n === 1 ? ' app' : ' apps') },
+      { id: 'consoles', label: 'Consoles', value: CONSOLES.filter(function (id) { return S.c.consolePorts[id]; }).length + ' mapped' },
       { id: 'samsung', label: 'Samsung', value: 'Home and TV settings' }];
   }
   function settingsIds() { return settingsRows().map(function (r) { return r.id; }); }
@@ -855,7 +873,7 @@
     if (id === 'editor') openEditor('settings');
     else openAppearance(id);
   }
-  var DETAIL_NAMES = { background: 'Background', layout: 'Layout', typography: 'Typography', focus: 'Focus', rotation: 'Rotation', samsung: 'Samsung', inputs: 'Inputs' };
+  var DETAIL_NAMES = { background: 'Background', layout: 'Layout', typography: 'Typography', focus: 'Focus', rotation: 'Rotation', samsung: 'Samsung', inputs: 'Inputs', consoles: 'Consoles', consolePort: 'HDMI assignment' };
   function choice(axis, value, disabled) {
     return { action: axis === 'mode' ? 'rotation.' + value : 'choice.' + axis + '.' + value, axis: axis, value: value, disabled: !!disabled,
       label: axis === 'font' ? FONTS[value].name : axis === 'mode' ? MODES.filter(function (m) { return m.id === value; })[0].name : value === 'both' ? 'Both' : VALUE_NAMES[value] };
@@ -863,6 +881,15 @@
   function detailSections(t) {
     var flat = S.c.bg !== 'photo', inactive = !materialApplies();
     function options(axis, values, disabled) { return values.map(function (value) { return choice(axis, value, disabled); }); }
+    if (t.group === 'consoles') return [{ id: 'consoles', title: '', items: CONSOLES.map(function (id) {
+      return { action: 'console.select.' + id, label: app(id).name,
+        description: S.c.consolePorts[id] ? 'HDMI ' + S.c.consolePorts[id] : 'Not assigned' };
+    }) }];
+    if (t.group === 'consolePort') return [{ id: 'consolePort', title: app(t.consoleId).name, items:
+      [0, 1, 2, 3, 4].map(function (port) {
+        return { action: 'console.map.' + t.consoleId + '.' + port, label: port ? 'HDMI ' + port : 'Unassigned',
+          consoleId: t.consoleId, port: port, description: port ? 'Select this HDMI input' : 'Disable this shortcut' };
+      }) }];
     if (t.group === 'inputs') return [{ id: 'inputs', title: '', items: t.inputs.length ? t.inputs.map(function (input) {
       return { action: 'input.' + input.number, label: input.name, description: input.active ? 'Active' : input.connected ? 'Connected' : 'Disconnected — may be asleep' };
     }) : [{ action: 'inputs.retry', label: t.loading ? 'Loading inputs…' : 'Try again', disabled: t.loading }],
@@ -892,7 +919,7 @@
     ] }];
   }
   function detailRows(t) {
-    var rows = [[{ action: 'settings.back', label: t.group === 'rotation' ? 'Background' : t.group === 'inputs' ? 'Samsung' : 'Settings' }]];
+    var rows = [[{ action: 'settings.back', label: t.group === 'rotation' ? 'Background' : t.group === 'inputs' ? 'Samsung' : t.group === 'consolePort' ? 'Consoles' : 'Settings' }]];
     detailSections(t).forEach(function (section) {
       var enabled = section.items.filter(function (item) { return !item.disabled; });
       if (section.horizontal && enabled.length) rows.push(enabled);
@@ -930,7 +957,10 @@
   function openInputs() {
     openAppearance('inputs'); var t = top(); t.inputs = []; loadInputs(t);
   }
-  function detailBack() { cancelLook(); S.err = null; pop(); FrameDevice.cancelSource(); }
+  function detailBack() {
+    if (top().group === 'consolePort') { top().group = 'consoles'; top().f.action = 'settings.back'; S.err = null; return; }
+    cancelLook(); S.err = null; pop(); FrameDevice.cancelSource();
+  }
   function detailOk(t, item) {
     var patch = {}, error = S.lookError;
     if (item.action === 'settings.back') { detailBack(); return; }
@@ -943,6 +973,15 @@
     else if (item.axis) { patch[item.axis] = item.value; setLook(patch, { row: item.axis }); }
     else if (item.action === 'background.wallpaper') openWallpaper();
     else if (item.action === 'background.rotation') openAppearance('rotation');
+    else if (item.action.indexOf('console.select.') === 0) {
+      t.consoleId = item.action.slice('console.select.'.length); t.group = 'consolePort'; t.f.action = 'settings.back';
+    }
+    else if (item.action.indexOf('console.map.') === 0) {
+      var port = Number(item.action.slice(item.action.lastIndexOf('.') + 1)), c = next(S.c.home.slice(), S.c.recent.slice());
+      if (CONSOLES.indexOf(t.consoleId) < 0 || port < 0 || port > 4 || Math.floor(port) !== port) return;
+      c.consolePorts[t.consoleId] = port || null;
+      if (!write(c, 'Console HDMI mapping')) S.note = 'Could not save console HDMI assignment.';
+    }
     else if (item.action === 'samsung.home') perform('Samsung Home', FrameDevice.home);
     else if (item.action === 'samsung.settings') perform('TV settings', FrameDevice.settings);
     else if (item.action === 'samsung.inputs') openInputs();
@@ -1414,12 +1453,12 @@
     appearanceTitle.textContent = DETAIL_NAMES[t.group];
     var at = detailLocation(t), selected = at.item, error = S.lookError, status = '', hint;
     function command(item, inner, cls) {
-      var applied = item.axis && S.c[item.axis] === item.value;
+      var applied = item.consoleId ? S.c.consolePorts[item.consoleId] === (item.port || null) : item.axis && S.c[item.axis] === item.value;
       var loading = !!(item.axis && S.pending && S.pending.target[item.axis] === item.value && S.pending.row === item.axis);
       return '<button type="button" tabindex="-1" class="setting-choice' + (cls ? ' ' + cls : '') + (t.f.action === item.action ? ' is-focus' : '') + (item.disabled ? ' is-disabled' : '') + (applied ? ' is-applied' : '') + (loading ? ' is-loading' : '') + '"'
-        + (item.axis ? ' role="radio" aria-checked="' + !!applied + '"' : '') + ' aria-label="' + esc(item.axis && item.value === 'both' ? 'Icons and text' : item.label) + '" aria-disabled="' + !!item.disabled + '" aria-busy="' + loading + '"'
+        + (item.axis || item.consoleId ? ' role="radio" aria-checked="' + !!applied + '"' : '') + ' aria-label="' + esc(item.axis && item.value === 'both' ? 'Icons and text' : item.label) + '" aria-disabled="' + !!item.disabled + '" aria-busy="' + loading + '"'
         + ' data-z="detail" data-i="0" data-id="' + item.action + '" data-action="' + item.action + '">' + inner
-        + (item.axis ? '<span class="setting-tick" aria-hidden="true">' + (applied ? icon('check') : '') + '</span>' : '') + '</button>';
+        + (item.axis || item.consoleId ? '<span class="setting-tick" aria-hidden="true">' + (applied ? icon('check') : '') + '</span>' : '') + '</button>';
     }
     setHTML(appearanceBack, command({ action: 'settings.back', label: t.group === 'rotation' ? 'Background' : t.group === 'inputs' ? 'Samsung' : 'Settings' }, icon('left') + '<span>' + (t.group === 'rotation' ? 'Background' : t.group === 'inputs' ? 'Samsung' : 'Settings') + '</span>', 'setting-back'));
     setHTML(appearanceRows, detailSections(t).map(function (section) {
