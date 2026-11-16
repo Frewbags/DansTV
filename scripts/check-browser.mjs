@@ -303,7 +303,19 @@ try {
     await current.waitForFunction(() => window.ShoreQA && !ShoreQA.state().pending && !ShoreQA.ready());
     const before = await stored();
     failImages = false;
-    await current.evaluate(() => window.__setHidden(false)); await ready();
+    await current.evaluate(() => window.__setHidden(false));
+    try {
+      await ready();
+    } catch (error) {
+      const diagnostics = await current.evaluate(() => ({
+        hidden: document.hidden, state: ShoreQA.state(),
+        images: ['photo', 'matImg', 'phFieldImg', 'utFieldImg'].map(id => {
+          const img = document.getElementById(id);
+          return { id, source: img.currentSrc || img.src, complete: img.complete, naturalWidth: img.naturalWidth };
+        })
+      }));
+      throw Error('Visible wallpaper retry did not settle: ' + JSON.stringify(diagnostics));
+    }
     check('Visible retry restores a complete wallpaper without a preference write', same(await stored(), before) && await current.evaluate(() => document.getElementById('photo').naturalWidth > 0));
   });
   await run('Visibility return preserves an unapplied wallpaper preview', async () => {
