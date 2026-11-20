@@ -145,7 +145,16 @@ succeed. After Prepare without Listen, interruption or failure, run:
 ```
 
 Restore the TV's saved Remote PC password to the ordinary lab password as
-well. The host receiver exits on result/timeout; Ctrl+C stops it early.
+well. To enter the *original* lab password without displaying it, after
+`Restore` and a passing `Doctor`, focus the TV Remote PC password box and
+run `py scripts/tiz0wn/paste-password.py send-normal` from the PC. This
+new action reads only the ignored local `.local/tiz0wn-lab/lab.env`, accepts
+the original `rdp-lab.ps1`-generated credential format, and refuses to send
+if any UID/snapshot backup or session marker still exists. It sends only
+text, with no Enter key or navigation, and does **not** run a snapshot.
+It cannot prove that Samsung's password input accepted external text; inspect
+the masked field on the TV before connecting. Never paste credentials into
+chat. The host receiver exits on result/timeout; Ctrl+C stops it early.
 Repeatability, the TV credential restoration and physical Shared Folder
 flow still require owner observation. Do not proceed to Home writes until
 the actual Q80T report and independent recovery path are verified.
