@@ -1,0 +1,25 @@
+{
+  "profile_version": 1,
+  "model": "QA65Q80TAWXXY",
+  "firmware": "T-NKMUABC-2743.0",
+  "registry": "/opt/dbspace/.pkgmgr_parser.db",
+  "notes": "TEMPLATE ONLY. Leave all groups empty until each app ID is verified on the physical Q80T. Do not copy app IDs from Tizen 9 or Android lists.",
+  "groups": {
+    "advertising": {
+      "description": "Optional viewing-recognition, analytics and advertisement components verified on this Q80T; do not assume names imply safe disablement.",
+      "apps": []
+    },
+    "voice": {
+      "description": "Optional voice assistant features; only after owner confirms voice functions are unwanted.",
+      "apps": []
+    },
+    "smart-extras": {
+      "description": "Optional Samsung extras after dependency review. Preserve HDMI, Settings, Live TV, and Remote PC lab.",
+      "apps": []
+    },
+    "tv-plus": {
+      "description": "Optional Samsung TV Plus application, if installed and owner wishes to disable it.",
+      "apps": []
+    }
+  }
+}
