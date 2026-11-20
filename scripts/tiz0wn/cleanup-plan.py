@@ -11,6 +11,7 @@ import hashlib
 import json
 import os
 from pathlib import Path
+from contextlib import closing
 import re
 import sqlite3
 
@@ -164,7 +165,7 @@ def private_output(path: Path) -> Path:
 
 
 def inspect(snapshot: Path, output: Path) -> None:
-    with open_snapshot(snapshot) as db:
+    with closing(open_snapshot(snapshot)) as db:
         # Only the columns needed for a future reviewed profile; no private
         # account fields or broad proprietary database export.
         rows = db.execute(
