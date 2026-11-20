@@ -197,7 +197,7 @@ def inspect(snapshot: Path, output: Path) -> None:
 def plan(snapshot: Path, profile: Path, groups: list[str], output: Path) -> None:
     selected = read_profile(profile, groups)
     records = []
-    with open_snapshot(snapshot) as db:
+    with closing(open_snapshot(snapshot)) as db:
         for item in selected:
             flags = fetch_flags(db, item["app_id"])
             if flags == DISABLED:
