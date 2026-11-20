@@ -24,6 +24,10 @@ Scope: owner-operated QA65Q80TAWXXY, T-NKMUABC-2743.0 (Tizen 5.5). This note rec
 - `root-bridge.py` only accepts a validated report from the configured TV IP, tied to a one-time session token and expected report markers. **No such report has yet been obtained on this Q80T**.
 - The independently developed `tools/container-readiness/` utility was reportedly verified locally with 23 Pester tests and a real `READY` response. **It is not present on the GitHub branch at the time this note was written**; preserve/commit it from the Windows checkout if desired.
 
+## Updated offline architecture work
+
+The [Curtisg890/Vetro Tizen 5.5 architecture comparison](q80t-vetro-tizen55-architecture.md) has been completed. The snapshot survey now includes read-only shell observations for Node presence, the signed dotnet launcher, app-data directory and survey SMACK label. The private-report assessor reduces those to **statuses only**; it never treats them as a verified service runtime, trusted broker or permission to modify Home. Synthetic tests were added to `test_assess_snapshot.py`; they still require execution in a checkout or CI to establish a passing run.
+
 ## Work possible without the TV
 
 Run from the Windows repository root, with Docker Desktop running. These checks do not start a TV diagnostic trial:
