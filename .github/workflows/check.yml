@@ -59,3 +59,6 @@ jobs:
               throw "PowerShell syntax error in $($script.FullName): $($errors -join '; ')"
             }
           }
+      - name: Verify Docker Compose raw interpolation with synthetic credentials
+        shell: pwsh
+        run: ./scripts/tiz0wn/test-compose-interpolation.ps1
