@@ -61,7 +61,24 @@ in the repository root, after updating your branch and running `npm run check`:
 Doctor verifies the private model/firmware preflight, dedicated account and
 SMB share, Docker, Python launcher, callback port, reviewed helper files
 and that no previous trial is active. It does **not** connect to the TV
-or change a credential or firewall rule. If it fails, resolve that exact
+or change a credential or firewall rule.
+
+**Docker Desktop must be running**, not merely installed. Doctor checks the
+Docker engine and performs a quiet Compose configuration validation. The
+snapshot wrapper supplies `LAB_HOST_IP` from the private ownership marker
+only for the duration of each Compose invocation; the Compose service's
+`env_file: format: raw` still reads the original ignored `lab.env`. The
+password-bearing file is **not** passed through Compose's CLI `--env-file`,
+which would interpolate the intentional literal `${IFS}` token. The process
+environment is restored after the command, including on failure.
+
+For an additional no-TV test, run
+`./scripts/tiz0wn/test-compose-interpolation.ps1` in PowerShell with the
+Docker Compose CLI available. It uses a disposable **synthetic** password
+and copy of the YAML under the OS temporary directory; it never reads or
+prints the real lab password. This is also checked by Windows CI. A
+successful Doctor or synthetic test does **not** verify the TV trigger,
+credential Restore or physical Home-button compatibility. If it fails, resolve that exact
 prerequisite before attempting Prepare; never bypass model or firmware guards.
 
 Use an Administrator PowerShell window from the repository root. Prepare
