@@ -56,6 +56,19 @@ class AssessmentTests(unittest.TestCase):
         self.assertEqual(result["home_key_filter"], "unavailable")
         self.assertFalse(result["home_change_authorised"])
 
+    def test_firmware_must_be_reported_once_in_the_dedicated_section(self):
+        expected = "Version=T-NKMUABC-2743.0;"
+        wrong = assessor.assess(fixture().replace(expected, "Version=T-OTHER-2743.0;"))
+        self.assertEqual(wrong["firmware_marker"], "not observed")
+
+        misplaced = fixture().replace(expected, "Version=unknown;")
+        misplaced = misplaced.replace("Sample Q80T inventory (fake data)",
+                                      expected + "\\nSample Q80T inventory (fake data)")
+        self.assertEqual(assessor.assess(misplaced)["firmware_marker"], "not observed")
+
+        repeated = fixture().replace(expected, expected + "\\n" + expected)
+        self.assertEqual(assessor.assess(repeated)["firmware_marker"], "not observed")
+
     def test_rejects_failed_or_spoofed_report_markers(self):
         for report in (
             fixture(valid=False),
