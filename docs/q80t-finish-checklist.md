@@ -14,10 +14,20 @@ T-NKMUABC-2743.0. Owner branch: `feature/q80t-windows-setup`, draft PR #1.
 | Cross-platform `npm run check`, Windows CI, snapshot assessor | Added subsequently; rerun/CI evidence pending |
 | Volume / mute | Web API adapter has mock coverage; physical Q80T validation pending |
 | HDMI, applications, Back and Samsung Settings | Automated mock coverage; full current-build hardware regression pending |
-| Read-only root snapshot transport | Offline test implementation; **not yet verified on Q80T** |
+| Read-only root snapshot transport | Attempted with long mixed-character credential; **no validated report received** |
+| Tizen 5.5 integration prerequisites | Read-only inventory and conservative assessor checks added; **no Q80T runtime or broker evidence yet** |
+| Vetro fork integration | Reviewed Curtisg890 `tizen55-tiz0wn-backend`; **reference design only**, not imported or installed |
 | Elevated access | One bounded UID-0 callback observed, not an enduring root shell |
 | Home-button replacement / cold boot | **Not achieved on this Q80T** |
 | Service cleanup / boot modification | **Not applied** |
+
+## Offline architecture decision — 21 November
+
+Curtisg890's [Tizen 5.5 Vetro backend](https://github.com/Curtisg890/vetro/tree/tizen55-tiz0wn-backend) demonstrates an authenticated loopback root broker for a **different 2020 firmware**. It is not a root exploit, installed boot hook or Q80T launcher. Keep DansTV's static WGT and existing public Tizen controls; treat privileged services as a separately gated, optional backend.
+
+A future validated private snapshot will now report non-executing read-only indicators for Node on the shell PATH, the dotnet launcher, app-data directory and the survey shell SMACK label. They **do not** establish a TV web-service runtime or an authenticated broker. The assessor always reports those two as unmeasured and never authorises Home writes.
+
+See [architecture review](q80t-vetro-tizen55-architecture.md) and [current hardware evidence](q80t-nov21-offline-status.md). Do not repeat the previously failed long-password trial by following the historical procedure without reviewing these blockers.
 
 ## Owner-side completion sequence
 
