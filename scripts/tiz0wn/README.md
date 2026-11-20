@@ -53,7 +53,19 @@ the previous trial. It is not a general root shell. See the
 [21 November offline status](../../docs/q80t-nov21-offline-status.md)
 and current [handover](../../docs/q80t-root-handover.md).
 
-### Next hardware trial: one bounded snapshot
+### Reference procedure: bounded snapshot trial (currently blocked)
+
+**Do not repeat the former long mixed-character password attempt as written.**
+It failed to deliver a validated Q80T snapshot in November 2026. The
+shorter hardware proof, normal RDP login, and Linux password-hash checks
+do not establish that this longer credential is entered without alteration
+by SmartThings/the TV. Before another trial, independently validate the
+exact credential transport with a harmless test account, then re-review
+the privilege-boundary and report-integrity safeguards. The commands below
+remain as historical/recovery documentation, **not an instruction to run
+Prepare without that review**. See the
+[architecture assessment](../../docs/q80t-vetro-tizen55-architecture.md)
+and the [offline findings](../../docs/q80t-nov21-offline-status.md).
 
 First run the **read-only host doctor** from Administrator PowerShell
 in the repository root, after updating your branch and running `npm run check`:
