@@ -63,10 +63,10 @@ class AssessmentTests(unittest.TestCase):
 
         misplaced = fixture().replace(expected, "Version=unknown;")
         misplaced = misplaced.replace("Sample Q80T inventory (fake data)",
-                                      expected + "\\nSample Q80T inventory (fake data)")
+                                      expected + "\nSample Q80T inventory (fake data)")
         self.assertEqual(assessor.assess(misplaced)["firmware_marker"], "not observed")
 
-        repeated = fixture().replace(expected, expected + "\\n" + expected)
+        repeated = fixture().replace(expected, expected + "\n" + expected)
         self.assertEqual(assessor.assess(repeated)["firmware_marker"], "not observed")
 
     def test_rejects_failed_or_spoofed_report_markers(self):
