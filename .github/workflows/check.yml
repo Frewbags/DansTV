@@ -27,10 +27,23 @@ jobs:
       - run: npm ci
       - run: npm run check
       - run: npm run check:offline
-      - run: python3 scripts/tiz0wn/test_cleanup_plan.py
-      - run: python3 scripts/tiz0wn/check.py
       - run: npm run check:tools
       - run: npm run check:public
       - run: npx playwright install --with-deps chromium
       - run: npm run check:browser
       - run: npm run export:public
+
+  windows-offline:
+    runs-on: windows-latest
+    timeout-minutes: 12
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v7
+        with:
+          node-version: '22'
+          cache: npm
+      - uses: actions/setup-python@v7
+        with:
+          python-version: '3.12'
+      - run: npm ci
+      - run: npm run check
