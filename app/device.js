@@ -156,6 +156,31 @@
       api().launchAppControl(control, 'org.tizen.art-app', function () { finish(null); }, function (err) { finish(failure(err)); });
     } catch (err) { finish(failure(err)); }
   }
+  /* Samsung's public TVAudioControl API. Availability and behaviour vary by TV/output. */
+  function audioStatus() {
+    var control = window.tizen && window.tizen.tvaudiocontrol, level, muted;
+    if (!control || typeof control.getVolume !== 'function' || typeof control.isMute !== 'function') {
+      return { available: false, message: 'Audio controls are unavailable on this TV.' };
+    }
+    try {
+      level = control.getVolume(); muted = control.isMute();
+      if (typeof level !== 'number' || !isFinite(level) || level < 0 || level > 100 || typeof muted !== 'boolean') {
+        return { available: false, message: 'The TV reported an unexpected audio state.' };
+      }
+      return { available: true, volume: level, muted: muted };
+    } catch (err) { return { available: false, message: 'The TV did not permit audio control.' }; }
+  }
+  function audioAdjust(action) {
+    var control = window.tizen && window.tizen.tvaudiocontrol, before = audioStatus();
+    if (!before.available) return before;
+    try {
+      if (action === 'up' && typeof control.setVolumeUp === 'function') control.setVolumeUp();
+      else if (action === 'down' && typeof control.setVolumeDown === 'function') control.setVolumeDown();
+      else if (action === 'mute' && typeof control.setMute === 'function') control.setMute(!before.muted);
+      else return { available: false, message: 'This audio adjustment is not available.' };
+      return audioStatus();
+    } catch (err) { return { available: false, message: 'The TV could not change the volume.' }; }
+  }
   function home(done) { launchApp('com.samsung.tv.csfs', done); }
   function settings(done) { launchApp('com.samsung.tv.coba.setting', done); }
   function apps(done) {
@@ -180,5 +205,5 @@
       }, function (err) { finish(failure(err)); });
     } catch (err) { finish(failure(err)); }
   }
-  window.FrameDevice = { launch: launch, launchApp: launchApp, launchNamed: launchNamed, liveTV: liveTV, art: art, home: home, settings: settings, apps: apps, sources: sources, setSource: setSource, cancelSource: cancelSource };
+  window.FrameDevice = { launch: launch, launchApp: launchApp, launchNamed: launchNamed, liveTV: liveTV, art: art, home: home, settings: settings, apps: apps, sources: sources, setSource: setSource, cancelSource: cancelSource, audioStatus: audioStatus, audioAdjust: audioAdjust };
 }());
