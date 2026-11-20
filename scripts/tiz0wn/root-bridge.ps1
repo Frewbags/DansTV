@@ -14,17 +14,26 @@ if (-not $principal.IsInRole([Security.Principal.WindowsBuiltInRole]::Administra
     throw 'Run this command in Administrator PowerShell.'
 }
 $owner = Get-Content -LiteralPath (Join-Path $lab 'ownership.json') -Raw | ConvertFrom-Json
-$device = Get-Content -LiteralPath (Join-Path $root '.local\device.json') -Raw | ConvertFrom-Json
-$preflight = Get-Content -LiteralPath (Join-Path $root '.local\tiz0wn-preflight.json') -Raw | ConvertFrom-Json
-if ($owner.user -ne 'danstvprobe' -or $owner.share -ne 'DansTVProbe' -or $owner.tv -ne $device.host -or
-    $preflight.model_from_tv_menu -ne 'QA65Q80TAWXXY' -or $preflight.platform_version -ne '5.5' -or
-    $preflight.cpu_arch -ne 'armv7' -or $preflight.firmware_confirmed -ne $true -or
-    $preflight.firmware_from_current_tv_menu -ne 'T-NKMUABC-2743.0') {
-    throw 'Lab target changed; review exact Q80T configuration before proceeding.'
+if ($owner.user -ne 'danstvprobe' -or $owner.share -ne 'DansTVProbe') {
+    throw 'Unexpected lab ownership. Do not change unrelated Windows accounts or shares.'
 }
 foreach ($address in @($owner.pc, $owner.tv)) {
     $parsed = [Net.IPAddress]::Parse($address)
     if ($parsed.AddressFamily -ne [Net.Sockets.AddressFamily]::InterNetwork) { throw 'IPv4 lab required.' }
+}
+# Restoration must remain possible if the TV IP or firmware preflight has
+# changed since Prepare. Those safeguards still apply to every new trial.
+if ($Action -ne 'Restore') {
+    $device = Get-Content -LiteralPath (Join-Path $root '.local\device.json') -Raw | ConvertFrom-Json
+    $preflight = Get-Content -LiteralPath (Join-Path $root '.local\tiz0wn-preflight.json') -Raw | ConvertFrom-Json
+    if ($owner.tv -ne $device.host -or
+        $preflight.model_from_tv_menu -ne 'QA65Q80TAWXXY' -or
+        $preflight.platform_version -ne '5.5' -or
+        $preflight.cpu_arch -ne 'armv7' -or
+        $preflight.firmware_confirmed -ne $true -or
+        $preflight.firmware_from_current_tv_menu -ne 'T-NKMUABC-2743.0') {
+        throw 'Lab target changed; review exact Q80T configuration before proceeding.'
+    }
 }
 # Owner-run, read-only Windows host preflight. Never contacts the television.
 if ($Action -eq 'Doctor') {
