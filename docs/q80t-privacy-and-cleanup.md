@@ -40,6 +40,33 @@ Source: https://cleanyour.tv/not-android
   trial; do not combine the two Home methods without a live baseline.
   https://github.com/NelsonEU/arn0-tv/blob/main/docs/setup-tv.md
 
+## Read-only Home-button compatibility gate
+
+The Q80T already has an experimental app-context/SQLite Home-key trial. Arn0
+demonstrates a different native operation + vconf preference approach on a
+2022 Q70B (Tizen 6.5). Neither method has yet been verified on this 2020
+Q80T (Tizen 5.5). **Do not run both methods or copy Arn0's firmware guard.**
+
+The existing `scripts/tiz0wn/snapshot.sh` now records these values without
+changing them: `db/appfw/home_appid`, `startup_appid`,
+`booting_appid_backup`, `db/first_screen/type`, and
+`db/menu/smart_hub/ontvsetting/auto_start`. It also retains the current
+`XF86Home` key-filter query and prints the release Version if available.
+No defaults are inferred from failed/absent reads.
+
+Before any Home assignment, separately establish (a) exact target app ID
+on the installed Q80T; (b) actual native main-operation handler, which
+this shell survey **cannot measure**; (c) Home key-filter database schema
+and the actual original row(s); (d) full, independently verified off-TV
+original-state backups; and (e) working restore access with a concrete
+recovery test. Changes must be reversible, read back, and limited to a
+single researched method. A successful launcher API callback does not
+prove the physical Home button or cold boot behaves as intended.
+
+The snapshot helper is not a general interactive shell or installer.
+A fresh private hardware report has not yet been supplied; none of the
+Home/startup routes is currently confirmed for this specific TV.
+
 ## Offline Q80T inventory and cleanup plan
 
 `scripts/tiz0wn/cleanup-plan.py` is offline-only. It does not connect
