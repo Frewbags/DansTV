@@ -89,7 +89,7 @@ if ($Action -eq 'Doctor') {
         throw 'Python launcher py is missing; install Python 3 before running the receiver.'
     }
     Assert-DockerReady
-    Invoke-LabCompose @('config', '--quiet')
+    Invoke-LabCompose -composeArgs @('config', '--quiet')
     foreach ($file in @('snapshot.sh', 'root-bridge.py', 'paste-password.py')) {
         if (-not (Test-Path -LiteralPath (Join-Path $PSScriptRoot $file) -PathType Leaf)) {
             throw ('Missing reviewed helper: ' + $file)
@@ -110,13 +110,13 @@ function Rotate([string]$password) {
     # Before changing either Windows or XRDP credentials, ensure the engine
     # can accept the container recreate and safely resolve the Compose model.
     Assert-DockerReady
-    Invoke-LabCompose @('config', '--quiet')
+    Invoke-LabCompose -composeArgs @('config', '--quiet')
     $lines = @(Get-Content -LiteralPath $envFile | ForEach-Object {
         if ($_.StartsWith('TVPROBE_PASSWORD=')) { 'TVPROBE_PASSWORD=' + $password } else { $_ }
     })
     Set-LocalUser -Name 'danstvprobe' -Password (ConvertTo-SecureString $password -AsPlainText -Force)
     $lines | Set-Content -LiteralPath $envFile -Encoding ASCII
-    Invoke-LabCompose @('up', '-d', '--force-recreate', '--no-build')
+    Invoke-LabCompose -composeArgs @('up', '-d', '--force-recreate', '--no-build')
 }
 if ($Action -eq 'Restore') {
     # Revoke the network listener first; preserve backup until both credentials restore.
@@ -146,7 +146,7 @@ if ($Action -eq 'Prepare') {
         throw 'Callback port or firewall rule already active.'
     }
     Assert-DockerReady
-    Invoke-LabCompose @('config', '--quiet')
+    Invoke-LabCompose -composeArgs @('config', '--quiet')
     $bytes = New-Object byte[] 12
     $rng = [Security.Cryptography.RandomNumberGenerator]::Create()
     try { $rng.GetBytes($bytes) } finally { $rng.Dispose() }
