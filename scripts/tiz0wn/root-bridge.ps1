@@ -53,6 +53,9 @@ if ($Action -eq 'Doctor') {
     if (Get-NetTCPConnection -State Listen -LocalPort 8181 -ErrorAction SilentlyContinue) {
         throw 'Port 8181 is already listening; do not overlap diagnostic sessions.'
     }
+    if (Get-NetFirewallRule -Name $firewall -ErrorAction SilentlyContinue) {
+        throw 'An earlier snapshot callback firewall rule remains. Run Restore before starting a new trial.'
+    }
     if (-not (Get-Command py -ErrorAction SilentlyContinue)) {
         throw 'Python launcher py is missing; install Python 3 before running the receiver.'
     }
