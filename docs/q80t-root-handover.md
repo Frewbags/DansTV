@@ -2,6 +2,8 @@
 
 Updated 16 November 2026. Branch: `feature/q80t-windows-setup`; draft PR #1.
 
+> **21 November hardware follow-up:** The read-only snapshot remains uncollected. Normal RDP/Shared Folder and restoration were verified; a 128-character alphanumeric credential and short punctuation credentials authenticated on the Q80T. A combined long/mixed-character test failed even though its Linux hash matched. The entry-transport cause is not yet established. The Docker readiness checker passed locally but is not yet part of the GitHub branch or `root-bridge.ps1`. See [offline status and next-session checklist](q80t-nov21-offline-status.md) for the current evidence. Do not repeat old snapshot instructions blindly.
+
 ## Confirmed versus pending
 
 - Owner confirmed Remote PC/CIFS effective UID 0 on QA65Q80TAWXXY / T-NKMUABC-2743.0. Preserve this milestone; do not retry the unavailable dotnet route.
