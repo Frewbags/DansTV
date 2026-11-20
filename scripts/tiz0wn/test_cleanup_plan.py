@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 import importlib.util
+from contextlib import closing
 import json
 from pathlib import Path
 import sqlite3
@@ -182,7 +183,7 @@ class CleanupPlanTests(unittest.TestCase):
 
     def test_schema_guard(self):
         missing = self.work / "missing-schema.db"
-        with sqlite3.connect(missing) as connection:
+        with closing(sqlite3.connect(missing)) as connection:
             connection.execute("CREATE TABLE wrong_schema(id TEXT)")
         with self.assertRaisesRegex(ValueError, "Unknown package_app_info schema"):
             planner.open_snapshot(missing)
