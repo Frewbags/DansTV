@@ -75,7 +75,7 @@ lab ownership must match; addresses are read from private configuration.
 
 Then run `-Action Listen` in that window. While it listens, focus the TV's
 Remote PC password field. From a second window, use the already paired
-`python scripts/tiz0wn/paste-password.py send`. This sends only the prepared
+`py scripts/tiz0wn/paste-password.py send`. This sends only the prepared
 password, without Enter. Confirm acceptance on the TV, reconnect to the
 disposable desktop and open Samsung Shared Folder once. If that password
 field rejects remote text entry, enter the password from the private
