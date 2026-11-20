@@ -30,8 +30,29 @@ try {
     try { $model = ($output -join [Environment]::NewLine) | ConvertFrom-Json }
     catch { throw 'Compose emitted invalid JSON or interpolation warnings (output suppressed).' }
     $service = $model.services.'danstv-rdp'
-    if ($service.environment.TVPROBE_PASSWORD -cne 'literal${IFS}$(never_run)') {
-        throw 'Raw service password was interpolated or changed.'
+    # Compose config may re-escape literal dollars as $ so its rendered
+    # configuration can be fed back through the Compose parser. The resolved
+    # service model must preserve every dollar, brace, and command expression.
+    $expected = 'literal${IFS}$(never_run)'
+    $observed = [string]$service.environment.TVPROBE_PASSWORD
+    $configEscaped = $expected.Replace('
+    if ($service.ports.Count -ne 1 -or $service.ports[0].host_ip -ne '192.0.2.44') {
+        throw 'Compose did not use the temporary process LAB_HOST_IP for port binding.'
+    }
+    Write-Output 'Synthetic Compose interpolation passed: scoped host and literal raw service password.'
+} finally {
+    if ($null -eq $previousHostIP) {
+        Remove-Item Env:LAB_HOST_IP -ErrorAction SilentlyContinue
+    } else {
+        $env:LAB_HOST_IP = $previousHostIP
+    }
+    if (Test-Path -LiteralPath $fixtureRoot) {
+        Remove-Item -LiteralPath $fixtureRoot -Recurse -Force
+    }
+}
+, '$')
+    if ($observed -cne $expected -and $observed -cne $configEscaped) {
+        throw 'Raw service password was interpolated, lost or changed (synthetic fixture only).'
     }
     if ($service.ports.Count -ne 1 -or $service.ports[0].host_ip -ne '192.0.2.44') {
         throw 'Compose did not use the temporary process LAB_HOST_IP for port binding.'
