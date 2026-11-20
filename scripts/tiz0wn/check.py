@@ -20,6 +20,18 @@ assert "DANSTV_HOME_WRITE_CONFIRM" in HOME, "Apply must require explicit opt-in"
 assert "need_root" in HOME and "need_record" in HOME
 assert ".backup" in HOME and "sha256sum" in HOME
 assert "scripts/tiz0wn" not in SNAPSHOT, "Snapshot must be a read-only standalone TV script"
+# The Q80T inventory must capture the alternative native Home/startup
+# preference selectors before anyone infers compatibility from another model.
+for key in (
+    "db/appfw/home_appid",
+    "db/appfw/startup_appid",
+    "db/appfw/booting_appid_backup",
+    "db/first_screen/type",
+    "db/menu/smart_hub/ontvsetting/auto_start",
+):
+    assert key in SNAPSHOT, "Missing read-only Home preference inventory: " + key
+assert "Native main-operation handler: not measured" in SNAPSHOT
+assert not re.search(r"\bvconftool\s+set\b|\bapp_operation_set_current_app\b|\bsqlite3\s+\$DB\s+UPDATE\b", SNAPSHOT), "Snapshot must not modify Home or startup"
 assert "install" not in PREFLIGHT.lower() or "does not" in PREFLIGHT.lower()
 assert "com.samsung.tv.csfs" in HOME and "com.samsung.tv.searchall" in HOME
 assert not re.search(r"\b(pkgcmd\s+-[uD]|rm\s+-rf|mkfs|dd\s+if=)", HOME), "Home script must not bulk-delete or overwrite partitions"
