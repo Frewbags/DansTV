@@ -7,6 +7,24 @@ date -u '+%Y-%m-%dT%H:%M:%SZ' 2>/dev/null || :
 uname -a 2>/dev/null || :
 cat /etc/tizen-release 2>/dev/null || :
 cat /etc/info.ini 2>/dev/null | head -25 || :
+# Integration inventory is deliberately a *shell* survey, not evidence of
+# the web-service Node runtime, a provisioned broker, or an enabled Home hook.
+# Do not launch new processes as root merely to identify a runtime.
+printf '\n=== Tizen 5.5 service prerequisites (read-only) ===\n'
+printf 'Node executable in PATH: '
+if command -v node >/dev/null 2>&1; then printf 'present\n'; else printf 'not observed\n'; fi
+printf 'dotnet launcher executable: '
+if [ -x /usr/bin/dotnet-launcher ]; then printf 'present\n'; else printf 'not observed\n'; fi
+printf 'apps_rw data directory: '
+if [ -d /opt/usr/home/owner/apps_rw ]; then printf 'present\n'; else printf 'not observed\n'; fi
+printf 'Survey shell SMACK label: '
+if [ -r /proc/self/attr/current ]; then
+    cat /proc/self/attr/current 2>/dev/null || printf 'unreadable\n'
+else
+    printf 'not readable\n'
+fi
+printf 'Web-service Node version: not measured by this shell survey\n'
+printf 'Broker ownership and authentication: not measured by this shell survey\n'
 printf '\n=== Home / startup preference inventory (read-only) ===\n'
 # Arn0/Q70B and CleanFrame/Frame reports use different Home interfaces.
 # Record exact Q80T values before selecting a method; missing values are not defaults.
