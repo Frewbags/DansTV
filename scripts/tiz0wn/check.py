@@ -36,6 +36,21 @@ assert "install" not in PREFLIGHT.lower() or "does not" in PREFLIGHT.lower()
 assert "com.samsung.tv.csfs" in HOME and "com.samsung.tv.searchall" in HOME
 assert not re.search(r"\b(pkgcmd\s+-[uD]|rm\s+-rf|mkfs|dd\s+if=)", HOME), "Home script must not bulk-delete or overwrite partitions"
 
+# Cross-platform source guards for Windows snapshot credential recovery.
+# This does not execute Administrator commands or open real credentials.
+BRIDGE = (ROOT / "root-bridge.ps1").read_text(encoding="utf-8")
+COMPOSE = (ROOT / "lab" / "compose.yml").read_text(encoding="utf-8")
+assert "--env-file" not in BRIDGE, "Never feed a password-bearing lab.env to Compose interpolation"
+assert "env_file:" in COMPOSE and "format: raw" in COMPOSE
+assert "${LAB_HOST_IP:" in COMPOSE, "Host port must come from scoped LAB_HOST_IP"
+assert "[Environment]::GetEnvironmentVariable('LAB_HOST_IP', 'Process')" in BRIDGE
+assert "Remove-Item Env:LAB_HOST_IP" in BRIDGE
+assert "if ($Action -ne 'Restore')" in BRIDGE, "Restore must bypass the current TV firmware gate"
+assert "if ($hadSession -and -not $hadBackup)" in BRIDGE, "Preserve unknown credential state"
+rotate = BRIDGE.split("function Rotate(", 1)[1].split("if ($Action -eq 'Restore')", 1)[0]
+assert rotate.index("Assert-DockerReady") < rotate.index("Set-LocalUser")
+assert "Invoke-LabCompose -composeArgs @('config', '--quiet')" in rotate
+
 # Extract actual SQL strings from the checked-in shell script, then execute them
 # in an isolated SQLite fixture. This catches misspelled columns/conditions and
 # verifies that unrelated key rules and managed apps are not changed.
