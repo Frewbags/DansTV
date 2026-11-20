@@ -112,6 +112,33 @@ class TransportTests(unittest.TestCase):
         with self.assertRaises(ValueError):
             paste.prepared_password(lab)
 
+    def test_ordinary_password_requires_restored_owned_lab(self):
+        lab = Path(self.directory.name)
+        original = 'TvA9A1B2C3D4E5F6'
+        env = lab / 'lab.env'
+        env.write_text('TVPROBE_USER=danstvprobe\nTVPROBE_PASSWORD=' + original + '\n', encoding='ascii')
+        owner = lab / 'ownership.json'
+        owner.write_text(json.dumps({'user': 'danstvprobe', 'share': 'DansTVProbe'}), encoding='utf-8')
+        self.assertEqual(paste.normal_password(lab), original)
+        for marker in ('lab.env.before-uid', 'lab.env.before-snapshot', 'snapshot-session.json'):
+            path = lab / marker
+            path.touch()
+            with self.assertRaises(ValueError):
+                paste.normal_password(lab)
+            path.unlink()
+        for invalid in ('$(/usr/bin/curl${IFS}http://test)', 'TvA9abc123', 'a' * 16):
+            env.write_text('TVPROBE_PASSWORD=' + invalid + '\n', encoding='ascii')
+            with self.assertRaises(ValueError):
+                paste.normal_password(lab)
+        env.write_text('TVPROBE_PASSWORD=' + original + '\nTVPROBE_PASSWORD=' + original + '\n',
+                       encoding='ascii')
+        with self.assertRaises(ValueError):
+            paste.normal_password(lab)
+        env.write_text('TVPROBE_PASSWORD=' + original + '\n', encoding='ascii')
+        owner.write_text(json.dumps({'user': 'other', 'share': 'DansTVProbe'}), encoding='utf-8')
+        with self.assertRaises(ValueError):
+            paste.normal_password(lab)
+
     @unittest.skipUnless(os.name == 'posix' and shutil.which('bash') and Path('/usr/bin/curl').exists()
                          and os.geteuid() == 0, 'requires disposable Linux root test container')
     def test_actual_bash_download_source_report_and_cleanup(self):
