@@ -44,7 +44,7 @@ def section(lines: list[str], title: str) -> list[str]:
 def assess(text: str) -> dict:
     lines = text.splitlines()
     if len(lines) < 4 or lines[:2] != list(MARKERS[:2]) or lines[-2:] != list(MARKERS[-2:]):
-        raise ValueError("Not a complete, successful authenticated Q80T snapshot report")
+        raise ValueError("Not a complete, successful Q80T snapshot report (format check only)")
     home = section(lines, "Home / startup preference inventory (read-only)")
     keys = {}
     for key in PREFS:
@@ -64,11 +64,14 @@ def assess(text: str) -> dict:
         home_key = "no row shown"
     else:
         home_key = "unverified"
-    firmware = any(
-        re.search(r"\bVersion=T-NKMUABC-2743\.0(?:;|\b)", line) for line in lines
+    # Only the dedicated preference/firmware section is evidence for the
+    # target build. A matching string in an unrelated diagnostic is not proof.
+    versions = [line.strip() for line in home if line.strip().startswith("Version=")]
+    firmware = len(versions) == 1 and bool(
+        re.fullmatch(r"Version=T-NKMUABC-2743\.0;?", versions[0])
     )
     return {
-        "root_report": "verified marker", "firmware_marker": "matched" if firmware else "not observed",
+        "root_report": "success markers present (not cryptographic proof)", "firmware_marker": "matched" if firmware else "not observed",
         "home_prefs": keys, "home_key_filter": home_key,
         "native_main_operation": "not measured",
         "home_change_authorised": False,
