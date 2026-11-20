@@ -51,6 +51,19 @@ current [handover](../../docs/q80t-root-handover.md).
 
 ### Next hardware trial: one bounded snapshot
 
+First run the **read-only host doctor** from Administrator PowerShell
+in the repository root, after updating your branch and running `npm run check`:
+
+```powershell
+.\scripts\tiz0wn\root-bridge.ps1 -Action Doctor
+```
+
+Doctor verifies the private model/firmware preflight, dedicated account and
+SMB share, Docker, Python launcher, callback port, reviewed helper files
+and that no previous trial is active. It does **not** connect to the TV
+or change a credential or firewall rule. If it fails, resolve that exact
+prerequisite before attempting Prepare; never bypass model or firmware guards.
+
 Use an Administrator PowerShell window from the repository root. Prepare
 restarts only the disposable XRDP container and rotates only its dedicated
 lab account credentials. The recorded exact model/firmware preflight and
@@ -84,6 +97,25 @@ Reports and receipt metadata remain in ignored `.local/tiz0wn-lab/` and
 their contents are not printed. This is trusted-LAN HTTP with a bearer
 token, without encryption or server identity protection; never expose it
 outside the trusted lab network.
+
+After the report is saved, **do not paste the raw snapshot into chat**:
+it may include unique network and device identifiers. Obtain a safe status
+summary using the local assessor (which never prints raw values or app IDs):
+
+```powershell
+$report = Get-ChildItem .local\tiz0wn-lab\snapshot-*.txt |
+    Sort-Object LastWriteTime -Descending | Select-Object -First 1
+if ($report) {
+    py scripts\tiz0wn\assess-snapshot.py --report $report.FullName
+}
+```
+
+It reports the exact-firmware marker, whether each Home preference was
+readable, whether an XF86Home row was observed and the native-operation
+query that **remains unmeasured**. This summary cannot approve Home writes;
+an off-TV database backup and verified restoration access are still required.
+Validate it offline through `npm run check` or
+`py scripts/tiz0wn/test_assess_snapshot.py`.
 
 Listen exits nonzero without a validated report and always invokes Restore
 after the receiver exits. Restore removes the callback firewall rule,
