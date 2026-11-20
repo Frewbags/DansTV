@@ -90,13 +90,22 @@ function Rotate([string]$password) {
 }
 if ($Action -eq 'Restore') {
     # Revoke the network listener first; preserve backup until both credentials restore.
+    $hadBackup = Test-Path -LiteralPath $backup
+    $hadSession = Test-Path -LiteralPath $sessionFile
     Get-NetFirewallRule -Name $firewall -ErrorAction SilentlyContinue | Remove-NetFirewallRule
-    if (Test-Path -LiteralPath $backup) {
+    if ($hadSession -and -not $hadBackup) {
+        throw 'Snapshot session exists but the credential backup is missing. Network access was revoked; local password state is UNKNOWN. Preserve session details and recover the dedicated lab credentials manually.'
+    }
+    if ($hadBackup) {
         Rotate (Password $backup)
         Remove-Item -LiteralPath $backup
     }
-    if (Test-Path -LiteralPath $sessionFile) { Remove-Item -LiteralPath $sessionFile }
-    Write-Output 'Snapshot access revoked and lab credentials restored. Update TV saved password from lab.env.'
+    if ($hadSession) { Remove-Item -LiteralPath $sessionFile }
+    if ($hadBackup) {
+        Write-Output 'Snapshot access revoked and lab credentials restored. Update TV saved password from lab.env.'
+    } else {
+        Write-Output 'No snapshot credential backup found; callback firewall permission revoked.'
+    }
     return
 }
 if ($Action -eq 'Prepare') {
