@@ -27,6 +27,8 @@ jobs:
       - run: npm ci
       - run: npm run check
       - run: npm run check:offline
+      - run: python3 scripts/tiz0wn/test_cleanup_plan.py
+      - run: python3 scripts/tiz0wn/check.py
       - run: npm run check:tools
       - run: npm run check:public
       - run: npx playwright install --with-deps chromium
