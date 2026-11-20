@@ -45,9 +45,13 @@ available for controlled testing. Do not commit any credential files.
 
 A bounded **read-only snapshot transport** is implemented in
 `root-bridge.py` with `root-bridge.ps1` for Windows orchestration. Local
-HTTP and Linux Bash/curl round trips pass; it has **not** been executed
-on the TV. It is not a general root shell. See the trial below and the
-current [handover](../../docs/q80t-root-handover.md).
+HTTP and Linux Bash/curl round trips pass. The longer diagnostic
+was attempted on the TV in November 2026, but **no validated full snapshot
+was received**. The checked-in trigger remains unchanged, and long
+mixed-character credential handling is unresolved; do not blindly repeat
+the previous trial. It is not a general root shell. See the
+[21 November offline status](../../docs/q80t-nov21-offline-status.md)
+and current [handover](../../docs/q80t-root-handover.md).
 
 ### Next hardware trial: one bounded snapshot
 
