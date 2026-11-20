@@ -70,10 +70,39 @@ def assess(text: str) -> dict:
     firmware = len(versions) == 1 and bool(
         re.fullmatch(r"Version=T-NKMUABC-2743\.0;?", versions[0])
     )
+    prerequisites = section(lines, "Tizen 5.5 service prerequisites (read-only)")
+
+    def signal(label: str) -> str:
+        # A shell-probe presence marker is deliberately not a compatibility
+        # verdict. Missing/duplicated/unknown output must remain unverified.
+        values = [line[len(label) + 2:].strip() for line in prerequisites
+                  if line.startswith(label + ": ")]
+        if len(values) != 1:
+            return "unverified"
+        if values[0] == "present":
+            return "observed"
+        if values[0] == "not observed":
+            return "not observed"
+        return "unverified"
+
+    smack_values = [line.split(": ", 1)[1].strip() for line in prerequisites
+                    if line.startswith("Survey shell SMACK label: ")]
+    smack = ("observed" if len(smack_values) == 1
+             and smack_values[0] not in ("", "unreadable", "not readable")
+             else "unverified")
+
     return {
         "root_report": "success markers present (not cryptographic proof)", "firmware_marker": "matched" if firmware else "not observed",
         "home_prefs": keys, "home_key_filter": home_key,
         "native_main_operation": "not measured",
+        "runtime_prerequisites": {
+            "node_executable_in_path": signal("Node executable in PATH"),
+            "dotnet_launcher": signal("dotnet launcher executable"),
+            "app_data_directory": signal("apps_rw data directory"),
+            "survey_shell_smack": smack,
+            "web_service_node_version": "not measured",
+            "authenticated_broker": "not measured",
+        },
         "home_change_authorised": False,
     }
 
@@ -99,6 +128,14 @@ def main() -> int:
         print(key + ":", status)
     print("XF86Home context:", result["home_key_filter"])
     print("Native Home main-operation:", result["native_main_operation"])
+    runtime = result["runtime_prerequisites"]
+    print("Node executable in snapshot shell PATH:", runtime["node_executable_in_path"])
+    print("dotnet-launcher executable:", runtime["dotnet_launcher"])
+    print("App-data directory:", runtime["app_data_directory"])
+    print("Snapshot shell SMACK label:", runtime["survey_shell_smack"])
+    print("Tizen web-service Node runtime:", runtime["web_service_node_version"])
+    print("Authenticated root broker:", runtime["authenticated_broker"])
+    print("These shell signals DO NOT establish a working Vetro/DansTV privileged service.")
     print("Home/startup changes authorised: NO")
     print("Next gate: inspect exact original values privately, export/verify off-TV")
     print("backups, and demonstrate an independent recovery route before writes.")
