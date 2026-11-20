@@ -1,4 +1,4 @@
-"""Type a prepared DansTV probe password through Samsung's LAN remote-input API.
+"""Type a validated DansTV lab password through Samsung's LAN remote-input API.
 
 Uses the owner-authorised Samsung remote WebSocket (WSS port 8002) and
 only sends text to the field the user explicitly focused. It does not
@@ -56,20 +56,39 @@ def prepared_password(lab: Path) -> str:
     return secret
 
 
+
+def normal_password(lab: Path) -> str:
+    """Read only the original generated lab credential after full trial restore."""
+    if any((lab / marker).exists() for marker in (
+            "lab.env.before-uid", "lab.env.before-snapshot", "snapshot-session.json")):
+        raise ValueError("A diagnostic trial may still be active; restore it first")
+    owner = json.loads((lab / "ownership.json").read_text(encoding="utf-8-sig"))
+    if owner.get("user") != "danstvprobe" or owner.get("share") != "DansTVProbe":
+        raise ValueError("Unexpected lab ownership")
+    entries = [line.removeprefix("TVPROBE_PASSWORD=") for line in
+               (lab / "lab.env").read_text(encoding="ascii").splitlines()
+               if line.startswith("TVPROBE_PASSWORD=")]
+    # rdp-lab.ps1 Setup generates 'TvA9' followed by six hex bytes.
+    # Never relay a command-substitution probe or an unknown replacement.
+    if len(entries) != 1 or not re.fullmatch(r"TvA9[0-9A-F]{12}", entries[0]):
+        raise ValueError("Not a restored, ordinary generated lab password")
+    return entries[0]
+
+
 def main() -> int:
     parser = argparse.ArgumentParser()
-    parser.add_argument("action", choices=("pair", "send"))
+    parser.add_argument("action", choices=("pair", "send", "send-normal"))
     args = parser.parse_args()
     if not TV_FILE.is_file():
         raise SystemExit("Missing .local/device.json (Q80T target).")
     host = json.loads(TV_FILE.read_text(encoding="utf-8")).get("host")
     if host != "192.168.50.169":
         raise SystemExit("Unexpected target TV; check the current Q80T IP first.")
-    if args.action == "send":
+    if args.action in ("send", "send-normal"):
         try:
-            secret = prepared_password(LAB)
+            secret = prepared_password(LAB) if args.action == "send" else normal_password(LAB)
         except (OSError, ValueError, KeyError):
-            raise SystemExit("No valid prepared trial; refusing to send.") from None
+            raise SystemExit("Requested password is not valid for the current lab state; refusing to send.") from None
     else:
         secret = None
     try:
@@ -112,10 +131,10 @@ def main() -> int:
         if not accepted:
             raise SystemExit("No Samsung remote-control approval received.")
         if args.action == "pair":
-            print("Paired. On TV focus the Remote PC PASSWORD box, then run the send command.")
+            print("Paired. On TV focus the Remote PC PASSWORD box, then run send or send-normal.")
             return 0
         assert secret is not None
-        print("Sending prepared text to the currently focused TV input (without pressing Enter)...")
+        print("Sending text to the currently focused TV input (without pressing Enter)...")
         ws.send(json.dumps({
             "method": "ms.channel.emit",
             "params": {"event": "custom.remote.textReceived", "to": "broadcast"},
