@@ -31,6 +31,17 @@ for key in (
 ):
     assert key in SNAPSHOT, "Missing read-only Home preference inventory: " + key
 assert "Native main-operation handler: not measured" in SNAPSHOT
+assert "Tizen 5.5 service prerequisites (read-only)" in SNAPSHOT
+for signal in (
+    "Node executable in PATH:",
+    "dotnet launcher executable:",
+    "apps_rw data directory:",
+    "Survey shell SMACK label:",
+    "Web-service Node version: not measured",
+    "Broker ownership and authentication: not measured",
+):
+    assert signal in SNAPSHOT, "Missing conservative Tizen 5.5 runtime signal: " + signal
+
 assert not re.search(r"\bvconftool\s+set\b|\bapp_operation_set_current_app\b|\bsqlite3\s+\$DB\s+UPDATE\b", SNAPSHOT), "Snapshot must not modify Home or startup"
 assert "install" not in PREFLIGHT.lower() or "does not" in PREFLIGHT.lower()
 assert "com.samsung.tv.csfs" in HOME and "com.samsung.tv.searchall" in HOME
