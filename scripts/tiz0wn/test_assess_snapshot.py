@@ -84,7 +84,7 @@ class AssessmentTests(unittest.TestCase):
         # Duplicate/ambiguous observations must not be interpreted as success.
         duplicate = fixture().replace(
             "Node executable in PATH: present",
-            "Node executable in PATH: present\\nNode executable in PATH: present",
+            "Node executable in PATH: present\nNode executable in PATH: present",
         )
         assessed = assessor.assess(duplicate)
         self.assertEqual(assessed["runtime_prerequisites"]["node_executable_in_path"], "unverified")
@@ -98,7 +98,7 @@ class AssessmentTests(unittest.TestCase):
 
     def test_runtime_private_values_are_not_exposed(self):
         assessed = assessor.assess(fixture())
-        summary = "\\n".join(assessed["runtime_prerequisites"].values())
+        summary = "\n".join(assessed["runtime_prerequisites"].values())
         self.assertNotIn("TEST-LABEL-SHOULD-BE-REDACTED", summary)
         self.assertNotIn("/opt/usr/home/owner/", summary)
 
