@@ -9,14 +9,26 @@ assessor = importlib.util.module_from_spec(spec)
 spec.loader.exec_module(assessor)
 
 
-def fixture(keys=True, context=True, valid=True):
+def fixture(keys=True, context=True, valid=True, runtime=True):
     result = [
         "DANSTV-ROOT-CHANNEL mode=Snapshot",
         "DANSTV-EUID=0",
         "=== Timestamp / platform ===",
         "Sample Q80T inventory (fake data)",
-        "=== Home / startup preference inventory (read-only) ===",
     ]
+    if runtime:
+        result.extend([
+            "=== Tizen 5.5 service prerequisites (read-only) ===",
+            "Node executable in PATH: present",
+            "dotnet launcher executable: not observed",
+            "apps_rw data directory: present",
+            "Survey shell SMACK label: TEST-LABEL-SHOULD-BE-REDACTED",
+            "Web-service Node version: not measured by this shell survey",
+            "Broker ownership and authentication: not measured by this shell survey",
+            "=== Home / startup preference inventory (read-only) ===",
+        ])
+    if not runtime:
+        result.append("=== Home / startup preference inventory (read-only) ===")
     if keys:
         result.extend([
             "db/appfw/home_appid: string com.samsung.tv.csfs",
@@ -49,12 +61,46 @@ class AssessmentTests(unittest.TestCase):
         self.assertEqual(result["home_prefs"]["db/appfw/booting_appid_backup"], "unavailable")
         self.assertEqual(result["native_main_operation"], "not measured")
         self.assertFalse(result["home_change_authorised"])
+        self.assertEqual(result["runtime_prerequisites"]["node_executable_in_path"], "observed")
+        self.assertEqual(result["runtime_prerequisites"]["dotnet_launcher"], "not observed")
+        self.assertEqual(result["runtime_prerequisites"]["app_data_directory"], "observed")
+        self.assertEqual(result["runtime_prerequisites"]["survey_shell_smack"], "observed")
+        self.assertEqual(result["runtime_prerequisites"]["web_service_node_version"], "not measured")
+        self.assertEqual(result["runtime_prerequisites"]["authenticated_broker"], "not measured")
+
 
     def test_missing_home_inventory_is_not_assumed(self):
         result = assessor.assess(fixture(keys=False, context=False))
         self.assertTrue(all(x == "missing" for x in result["home_prefs"].values()))
         self.assertEqual(result["home_key_filter"], "unavailable")
         self.assertFalse(result["home_change_authorised"])
+
+    def test_runtime_signals_cannot_authorise_service_or_home_changes(self):
+        missing = assessor.assess(fixture(runtime=False))["runtime_prerequisites"]
+        self.assertEqual(missing["node_executable_in_path"], "unverified")
+        self.assertEqual(missing["survey_shell_smack"], "unverified")
+        self.assertEqual(missing["authenticated_broker"], "not measured")
+
+        # Duplicate/ambiguous observations must not be interpreted as success.
+        duplicate = fixture().replace(
+            "Node executable in PATH: present",
+            "Node executable in PATH: present\\nNode executable in PATH: present",
+        )
+        assessed = assessor.assess(duplicate)
+        self.assertEqual(assessed["runtime_prerequisites"]["node_executable_in_path"], "unverified")
+        self.assertFalse(assessed["home_change_authorised"])
+
+        odd = fixture().replace(
+            "Survey shell SMACK label: TEST-LABEL-SHOULD-BE-REDACTED",
+            "Survey shell SMACK label: not readable",
+        )
+        self.assertEqual(assessor.assess(odd)["runtime_prerequisites"]["survey_shell_smack"], "unverified")
+
+    def test_runtime_private_values_are_not_exposed(self):
+        assessed = assessor.assess(fixture())
+        summary = "\\n".join(assessed["runtime_prerequisites"].values())
+        self.assertNotIn("TEST-LABEL-SHOULD-BE-REDACTED", summary)
+        self.assertNotIn("/opt/usr/home/owner/", summary)
 
     def test_firmware_must_be_reported_once_in_the_dedicated_section(self):
         expected = "Version=T-NKMUABC-2743.0;"
