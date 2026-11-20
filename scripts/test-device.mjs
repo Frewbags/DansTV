@@ -5,7 +5,7 @@ import vm from 'node:vm';
 import test from 'node:test';
 
 const source = readFileSync(new URL('../app/device.js', import.meta.url), 'utf8');
-function harness({ supported = true, throwSource = false } = {}) {
+function harness({ supported = true, throwSource = false, audioSupported = false, audioThrow = false } = {}) {
   let now = 0, next = 0;
   const timers = new Map(), requests = [], launches = [], sourceRequests = [], changes = [];
   let current = { type: 'HDMI', number: 2 };
@@ -15,6 +15,17 @@ function harness({ supported = true, throwSource = false } = {}) {
     launch: (id, ok, fail) => launches.push({ id, ok, fail })
   };
   const window = { tizen: { application } };
+  const audio = { volume: 25, muted: false, calls: [] };
+  if (audioSupported) {
+    function checkAudio() { if (audioThrow) throw Error('Audio feature rejected'); }
+    window.tizen.tvaudiocontrol = {
+      getVolume: () => { checkAudio(); return audio.volume; },
+      isMute: () => { checkAudio(); return audio.muted; },
+      setVolumeUp: () => { checkAudio(); audio.calls.push('up'); audio.volume = Math.min(100, audio.volume + 1); },
+      setVolumeDown: () => { checkAudio(); audio.calls.push('down'); audio.volume = Math.max(0, audio.volume - 1); },
+      setMute: state => { checkAudio(); audio.calls.push('mute:' + state); audio.muted = !!state; }
+    };
+  }
   if (supported) {
     window.tizen.systeminfo = { getPropertyValue: (name, ok, fail) => { assert.equal(name, 'VIDEOSOURCE'); sourceRequests.push({ ok, fail }); } };
     window.tizen.tvwindow = { getSource: (...args) => { assert.equal(args.length, 0); return current; },
@@ -29,7 +40,7 @@ function harness({ supported = true, throwSource = false } = {}) {
     now += ms;
     for (const [id, timer] of timers) if (timer.at <= now) { timers.delete(id); timer.callback(); }
   }
-  return { device: window.FrameDevice, requests, launches, sourceRequests, changes, advance, setCurrent: value => { current = value; } };
+  return { device: window.FrameDevice, requests, launches, sourceRequests, changes, audio, advance, setCurrent: value => { current = value; } };
 }
 
 test('a 500-app catalogue can arrive after the old eight-second deadline', () => {
@@ -253,4 +264,26 @@ test('unmapped source requests never silently choose an HDMI port', () => {
   assert.equal(h.launches.length, 0);
   assert.equal(result.length, 1);
   assert.ok(result[0]);
+});
+
+test('TVAudioControl is optional and does not impersonate a working TV', () => {
+  const missing = harness();
+  assert.equal(missing.device.audioStatus().available, false);
+  assert.equal(missing.device.audioAdjust('up').available, false);
+  const rejected = harness({ audioSupported: true, audioThrow: true });
+  assert.equal(rejected.device.audioStatus().available, false);
+  assert.equal(rejected.device.audioAdjust('mute').available, false);
+  assert.equal(rejected.audio.calls.length, 0);
+});
+
+test('TVAudioControl reads back volume and mute after each explicit adjustment', () => {
+  const h = harness({ audioSupported: true });
+  assert.equal(h.device.audioStatus().volume, 25);
+  assert.equal(h.device.audioAdjust('up').volume, 26);
+  assert.equal(h.device.audioAdjust('down').volume, 25);
+  assert.equal(h.device.audioAdjust('mute').muted, true);
+  assert.equal(h.device.audioAdjust('mute').muted, false);
+  assert.deepEqual(h.audio.calls, ['up', 'down', 'mute:true', 'mute:false']);
+  assert.equal(h.device.audioAdjust('unsupported').available, false);
+  assert.equal(h.audio.calls.length, 4);
 });
