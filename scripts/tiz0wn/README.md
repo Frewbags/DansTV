@@ -72,6 +72,28 @@ cold boot, Samsung essentials remain operational, debloating is
 reversible and ordinary operation needs neither a PC nor a USB drive.
 None of these target outcomes is asserted as installed today.
 
+### Offline privacy and cleanup planning (not deployed)
+
+Current tooling adds an **offline-only**, model-guarded Tizen registry
+cleanup planner and synthetic regression tests:
+
+- `scripts/tiz0wn/cleanup-plan.py` inspects a private Q80T SQLite snapshot,
+  then generates guarded `apply.sql`, `restore.sql` and a precise before-state.
+- `scripts/tiz0wn/q80t-cleanup-profile.example.json` contains deliberately
+  **no candidates** until exact app IDs and dependencies are established on
+  this television. It does not copy a Tizen 9 or Android list.
+- `scripts/tiz0wn/test_cleanup_plan.py` tests backup state, expected-value
+  guards, drift refusal, protected core IDs, wrong model and schema handling.
+- `docs/q80t-privacy-and-cleanup.md` covers non-privileged privacy switches
+  and source comparisons for CleanYourTV, Quiet Tizen and Arn0 Launcher.
+
+Arn0's 2022 Tizen 6.5 Q70B reportedly changed the main Home app-control
+operation and `db/appfw/home_appid` without root. This is an **alternative
+research approach**, not a verified Q80T path. Do not apply it alongside
+`home-ctx.sh` without exact live queries and independent rollback.
+
+All generated plans remain private under `.local/`. Nothing is run on the
+television automatically. See `docs/q80t-privacy-and-cleanup.md`.
 ## Current implementation
 
 | Component | Status | Source |
