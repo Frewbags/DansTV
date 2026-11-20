@@ -7,6 +7,30 @@ date -u '+%Y-%m-%dT%H:%M:%SZ' 2>/dev/null || :
 uname -a 2>/dev/null || :
 cat /etc/tizen-release 2>/dev/null || :
 cat /etc/info.ini 2>/dev/null | head -25 || :
+printf '\n=== Home / startup preference inventory (read-only) ===\n'
+# Arn0/Q70B and CleanFrame/Frame reports use different Home interfaces.
+# Record exact Q80T values before selecting a method; missing values are not defaults.
+if command -v vconftool >/dev/null 2>&1; then
+    for key in \
+        db/appfw/home_appid \
+        db/appfw/startup_appid \
+        db/appfw/booting_appid_backup \
+        db/first_screen/type \
+        db/menu/smart_hub/ontvsetting/auto_start
+    do
+        printf '%s: ' "$key"
+        if ! vconftool get "$key" 2>/dev/null; then
+            printf '(not readable or absent)\n'
+        fi
+    done
+else
+    echo 'vconftool unavailable; no Home preference inference'
+fi
+if [ -r /etc/prd_info.ini ]; then
+    grep '^Version=' /etc/prd_info.ini 2>/dev/null | head -1 || :
+fi
+printf 'Native main-operation handler: not measured by this shell survey\n'
+# Do not write appfw preferences, registry tables or native operation selectors.
 printf '\n=== Uptime / load / RAM (KiB) ===\n'
 cat /proc/uptime /proc/loadavg 2>/dev/null || :
 grep -E '^(MemTotal|MemFree|MemAvailable|Buffers|Cached|SwapTotal|SwapFree):' /proc/meminfo 2>/dev/null || :
