@@ -35,6 +35,35 @@ if ($Action -ne 'Restore') {
         throw 'Lab target changed; review exact Q80T configuration before proceeding.'
     }
 }
+# Keep Compose interpolation separate from the password-bearing service env_file.
+# A process-scoped host IP avoids passing literal ${IFS} in lab.env to the CLI.
+function Assert-DockerReady {
+    if (-not (Get-Command docker -ErrorAction SilentlyContinue)) {
+        throw 'Docker CLI is missing; lab credentials unchanged.'
+    }
+    & docker info --format '{{.ServerVersion}}' 2>$null | Out-Null
+    if ($LASTEXITCODE -ne 0) {
+        throw 'Docker engine is not running. Start Docker Desktop before rotating lab credentials.'
+    }
+    & docker compose version | Out-Null
+    if ($LASTEXITCODE -ne 0) { throw 'Docker Compose is unavailable; lab credentials unchanged.' }
+}
+function Invoke-LabCompose([string[]]$composeArgs) {
+    $previousHostIP = [Environment]::GetEnvironmentVariable('LAB_HOST_IP', 'Process')
+    try {
+        $env:LAB_HOST_IP = [string]$owner.pc
+        & docker compose -f $compose @composeArgs
+        if ($LASTEXITCODE -ne 0) {
+            throw ('Docker Compose ' + $composeArgs[0] + ' failed; review locally without sharing lab passwords.')
+        }
+    } finally {
+        if ($null -eq $previousHostIP) {
+            Remove-Item Env:LAB_HOST_IP -ErrorAction SilentlyContinue
+        } else {
+            $env:LAB_HOST_IP = $previousHostIP
+        }
+    }
+}
 # Owner-run, read-only Windows host preflight. Never contacts the television.
 if ($Action -eq 'Doctor') {
     if (-not (Test-Path -LiteralPath $envFile -PathType Leaf)) {
@@ -59,13 +88,8 @@ if ($Action -eq 'Doctor') {
     if (-not (Get-Command py -ErrorAction SilentlyContinue)) {
         throw 'Python launcher py is missing; install Python 3 before running the receiver.'
     }
-    if (-not (Get-Command docker -ErrorAction SilentlyContinue)) {
-        throw 'Docker is missing; do not start the snapshot trial.'
-    }
-    & docker compose version | Out-Null
-    if ($LASTEXITCODE -ne 0) {
-        throw 'Docker Compose is unavailable.'
-    }
+    Assert-DockerReady
+    Invoke-LabCompose @('config', '--quiet')
     foreach ($file in @('snapshot.sh', 'root-bridge.py', 'paste-password.py')) {
         if (-not (Test-Path -LiteralPath (Join-Path $PSScriptRoot $file) -PathType Leaf)) {
             throw ('Missing reviewed helper: ' + $file)
@@ -83,13 +107,16 @@ function Password([string]$file) {
 }
 function Rotate([string]$password) {
     $null = Password $envFile
+    # Before changing either Windows or XRDP credentials, ensure the engine
+    # can accept the container recreate and safely resolve the Compose model.
+    Assert-DockerReady
+    Invoke-LabCompose @('config', '--quiet')
     $lines = @(Get-Content -LiteralPath $envFile | ForEach-Object {
         if ($_.StartsWith('TVPROBE_PASSWORD=')) { 'TVPROBE_PASSWORD=' + $password } else { $_ }
     })
     Set-LocalUser -Name 'danstvprobe' -Password (ConvertTo-SecureString $password -AsPlainText -Force)
     $lines | Set-Content -LiteralPath $envFile -Encoding ASCII
-    & docker compose --env-file $envFile -f $compose up -d --force-recreate --no-build
-    if ($LASTEXITCODE -ne 0) { throw 'XRDP restart failed; run Restore.' }
+    Invoke-LabCompose @('up', '-d', '--force-recreate', '--no-build')
 }
 if ($Action -eq 'Restore') {
     # Revoke the network listener first; preserve backup until both credentials restore.
@@ -118,6 +145,8 @@ if ($Action -eq 'Prepare') {
     if ((Get-NetFirewallRule -Name $firewall -ErrorAction SilentlyContinue) -or (Get-NetTCPConnection -State Listen -LocalPort 8181 -ErrorAction SilentlyContinue)) {
         throw 'Callback port or firewall rule already active.'
     }
+    Assert-DockerReady
+    Invoke-LabCompose @('config', '--quiet')
     $bytes = New-Object byte[] 12
     $rng = [Security.Cryptography.RandomNumberGenerator]::Create()
     try { $rng.GetBytes($bytes) } finally { $rng.Dispose() }
