@@ -33,7 +33,7 @@ $sdb = Join-Path $sdk 'tools\sdb.exe'
 
 function Invoke-Python {
     param([string[]]$Arguments = @())
-    & python $widgetTool @Arguments
+    & py -3 $widgetTool @Arguments
     if ($LASTEXITCODE -ne 0) { throw 'Owner widget validation failed.' }
 }
 
