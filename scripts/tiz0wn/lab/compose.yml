@@ -1,5 +1,6 @@
 # RDP on the Windows PC. SMB remains the native Windows service on 445.
-# Host-IP/credentials come from an ignored local file supplied by --env-file.
+# root-bridge.ps1 scopes LAB_HOST_IP in the host process; the service reads
+# container credentials separately from its ignored raw lab.env file.
 services:
   danstv-rdp:
     build: .
