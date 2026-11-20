@@ -538,7 +538,9 @@
   function openAppearance(group) {
     var axis = { background: 'bg', layout: 'layout', typography: 'font', focus: 'focus' }[group];
     var action = S.detailFocus[group] || (axis ? 'choice.' + axis + '.' + S.c[axis] : group === 'rotation' ? 'rotation.' + S.c.mode : 'samsung.home');
-    push({ id: 'appearance', group: group, f: { action: action } });
+    var detail = { id: 'appearance', group: group, f: { action: action } };
+    if (group === 'samsung') detail.audio = FrameDevice.audioStatus();
+    push(detail);
   }
   function openMessage(key) { push({ id: 'message', msg: key, f: { b: 0 } }); }
   function openApps() {
@@ -912,11 +914,20 @@
     ];
     if (t.group === 'rotation') return [{ id: 'mode', title: '', items: options('mode', MODES.map(function (m) { return m.id; }), flat),
       reason: flat ? 'Choose Photo in Background to use rotation.' : 'Timed changes pause while Settings or another panel is open.' }];
-    return [{ id: 'samsung', title: '', items: [
-      { action: 'samsung.home', label: 'Samsung Home', description: 'Open Samsung’s Home screen' },
-      { action: 'samsung.settings', label: 'TV settings', description: 'Picture, sound and network settings' },
-      { action: 'samsung.inputs', label: 'Inputs', description: 'Choose an HDMI input' }
-    ] }];
+    var audio = t.audio || { available: false, message: 'Audio controls are unavailable.' };
+    var current = audio.available ? 'Volume ' + audio.volume + (audio.muted ? ' · muted' : '') : audio.message;
+    return [
+      { id: 'samsung', title: '', items: [
+        { action: 'samsung.home', label: 'Samsung Home', description: 'Open Samsung’s Home screen' },
+        { action: 'samsung.settings', label: 'TV settings', description: 'Picture, sound and network settings' },
+        { action: 'samsung.inputs', label: 'Inputs', description: 'Choose an HDMI input' }
+      ] },
+      { id: 'sound', title: 'Sound', items: [
+        { action: 'samsung.audio.down', label: 'Volume down', description: current, disabled: !audio.available },
+        { action: 'samsung.audio.up', label: 'Volume up', description: current, disabled: !audio.available },
+        { action: 'samsung.audio.mute', label: audio.muted ? 'Unmute' : 'Mute', description: current, disabled: !audio.available }
+      ], reason: audio.available ? '' : 'Use the TV remote to adjust volume.' }
+    ];
   }
   function detailRows(t) {
     var rows = [[{ action: 'settings.back', label: t.group === 'rotation' ? 'Background' : t.group === 'inputs' ? 'Samsung' : t.group === 'consolePort' ? 'Consoles' : 'Settings' }]];
@@ -985,6 +996,10 @@
     else if (item.action === 'samsung.home') perform('Samsung Home', FrameDevice.home);
     else if (item.action === 'samsung.settings') perform('TV settings', FrameDevice.settings);
     else if (item.action === 'samsung.inputs') openInputs();
+    else if (item.action.indexOf('samsung.audio.') === 0) {
+      t.audio = FrameDevice.audioAdjust(item.action.slice('samsung.audio.'.length));
+      t.audioError = t.audio.available ? null : t.audio.message;
+    }
     else if (item.action === 'inputs.retry') loadInputs(t);
     else if (item.action.indexOf('input.') === 0) perform(item.label, function (done) {
       FrameDevice.setSource(Number(item.action.slice(6)), function (err) {
@@ -1482,8 +1497,9 @@
       status = '<p class="setting-error">' + (error.type === 'save' ? 'Couldn’t save this change.' : error.type === 'font' ? 'Couldn’t load ' + esc(FONTS[error.font].name) + '.' : 'Couldn’t load this appearance.') + ' Your current choice is kept.</p>'
         + command({ action: 'settings.retry', label: 'Try again' }, '<span>Try again</span>', 'setting-retry');
     } else if (S.err) status = '<p class="setting-error">Could not save this change. Your previous assignment is kept.</p>';
+    else if (t.group === 'samsung' && t.audioError) status = '<p class="setting-error">' + esc(t.audioError) + '</p>';
     setHTML(appearanceStatus, status);
-    hint = selected.disabled ? '' : selected.action === 'settings.back' ? 'Return to ' + (t.group === 'rotation' ? 'Background' : t.group === 'inputs' ? 'Samsung' : t.group === 'consolePort' ? 'Consoles' : 'Settings') : selected.consoleId ? 'Assign HDMI input' : selected.action.indexOf('console.select.') === 0 ? 'Choose console input' : selected.action === 'settings.retry' ? 'Retry this change' : selected.axis ? 'Apply selected setting' : selected.action === 'background.wallpaper' ? 'Choose a wallpaper' : selected.action === 'background.rotation' ? 'Choose a rotation interval' : 'Open on the TV';
+    hint = selected.disabled ? '' : selected.action === 'settings.back' ? 'Return to ' + (t.group === 'rotation' ? 'Background' : t.group === 'inputs' ? 'Samsung' : t.group === 'consolePort' ? 'Consoles' : 'Settings') : selected.consoleId ? 'Assign HDMI input' : selected.action.indexOf('console.select.') === 0 ? 'Choose console input' : selected.action === 'settings.retry' ? 'Retry this change' : selected.axis ? 'Apply selected setting' : selected.action === 'background.wallpaper' ? 'Choose a wallpaper' : selected.action === 'background.rotation' ? 'Choose a rotation interval' : selected.action.indexOf('samsung.audio.') === 0 ? 'Adjust TV sound' : 'Open on the TV';
     setHTML(appearanceDesc, hint ? '<span class="remote-key">OK</span><span>' + esc(hint) + '</span>' : '');
   }
   function renderWallpaper(t) {
