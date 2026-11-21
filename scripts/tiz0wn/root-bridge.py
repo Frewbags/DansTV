@@ -1,6 +1,7 @@
 """Bounded, one-session Q80T inventory transport. No arbitrary command input."""
 from __future__ import annotations
 import base64
+import hashlib
 
 import argparse
 from datetime import datetime, timezone
@@ -52,16 +53,43 @@ rm -f "$OUT"
 '''.encode('utf-8')
 
 
-def staged_command_text(host: str, token: str, remote: str) -> bytes:
-    """Fixed read-only survey staged with SDB; try to remove the staged file after use."""
-    if not re.fullmatch(r'/home/owner/share/tmp/sdk_tools/dtvs[0-9a-f]{8}\.sh', remote):
-        raise ValueError('Staged file path must use the dedicated sdk_tools prefix')
-    payload = command_text('Snapshot', host, token) + ('rm -f ' + remote + '\n').encode('ascii')
-    # A single line, executed from TEXT via eval rather than passing an unsigned
-    # script path directly to the TV's UEP-gated shell.
-    encoded = base64.b64encode(payload).decode('ascii')
-    return ('/bin/sh -c "$(printf %s ' + encoded + ' | /usr/bin/base64 -d)"\n').encode('ascii')
+def staged_body_text(host: str, token: str) -> bytes:
+    """Fixed, read-only survey whose complete bytes are checked on the TV."""
+    return command_text("Snapshot", host, token)
 
+
+def staged_command_text(host: str, token: str, remote: str,
+                        body_remote: str, body_sha256: str) -> bytes:
+    """Generate a short loader that requires PC-approved TV-side SHA-256."""
+    prefix = '/home/owner/share/tmp/sdk_tools/'
+    if not re.fullmatch(r'[0-9a-f]{24,48}', token):
+        raise ValueError('Invalid staged token')
+    suffix = token[:8]
+    if remote != prefix + 'dtvs' + suffix + '.sh':
+        raise ValueError('Unexpected loader path')
+    if body_remote != prefix + 'dtvb' + suffix + '.sh':
+        raise ValueError('Unexpected survey path')
+    if not re.fullmatch(r'[0-9a-f]{64}', body_sha256):
+        raise ValueError('Invalid survey SHA-256')
+    ipaddress.IPv4Address(host)
+    # Retail SDB can reject pull. The receiver checks a checksum computed
+    # on the TV before authorising any survey code. It returns only OK,
+    # not downloaded code. The short loader itself still relies on the
+    # trustworthiness of SDB push on the owner's private device.
+    source = (
+        'set -eu\n'
+        f'BODY="{body_remote}"\n'
+        'command -v sha256sum >/dev/null 2>&1 || exit 91\n'
+        'hash=$(sha256sum "$BODY" 2>/dev/null) || exit 92\n'
+        'hash=$(printf "%s" "$hash" | cut -d " " -f 1)\n'
+        'test "$(printf "%s" "$hash" | wc -c)" -eq 64 || exit 93\n'
+        f'approval=$(/usr/bin/curl -fsS --connect-timeout 5 --max-time 15 '
+        f'-X POST --data-binary "$hash" http://{host}:8181/v/{token}) || exit 94\n'
+        'test "$approval" = OK || exit 95\n'
+        '/bin/sh -c "$(/bin/cat "$BODY")"\n'
+    )
+    encoded = base64.b64encode(source.encode('ascii')).decode('ascii')
+    return ('/bin/sh -c "$(printf %s ' + encoded + ' | /usr/bin/base64 -d)"\n').encode('ascii')
 
 def valid_report(body: bytes) -> bool:
     lines = body.splitlines()
@@ -73,11 +101,16 @@ def valid_report(body: bytes) -> bool:
 
 class SnapshotServer(HTTPServer):
     """Single-threaded bounded receiver; one script fetch and one result."""
-    def __init__(self, address, tv: str, token: str, output: Path, staged: bool = False):
+    def __init__(self, address, tv: str, token: str, output: Path,
+                 staged: bool = False, expected_hash: str | None = None):
         self.tv, self.token, self.output = tv, token, output
         self.payload = command_text('Snapshot', address[0], token)
-        # Staged mode is only accepted with a separately verified SDB transfer.
-        # It receives a one-time result without serving an executable GET body.
+        if staged and not (expected_hash and re.fullmatch(r'[0-9a-f]{64}', expected_hash)):
+            raise ValueError('A staged receiver needs the expected SHA-256')
+        self.expected_hash = expected_hash if staged else None
+        self.stage_verified = False
+        # A staged session accepts only checksum and result POST requests;
+        # the HTTP endpoint never serves executable code in that mode.
         self.served = staged
         self.received = False
         super().__init__(address, Receiver)
@@ -119,10 +152,18 @@ class Receiver(BaseHTTPRequestHandler):
             self.reply(200, self.session.payload)
 
     def do_POST(self):
-        if not self.authorized('r'):
+        verifying = self.authorized('v') and self.session.expected_hash is not None
+        reporting = self.authorized('r')
+        if not verifying and not reporting:
             self.reply(404)
             return
         if not self.session.served or self.session.received:
+            self.reply(409)
+            return
+        if verifying and self.session.stage_verified:
+            self.reply(409)
+            return
+        if reporting and self.session.expected_hash and not self.session.stage_verified:
             self.reply(409)
             return
         try:
@@ -130,13 +171,23 @@ class Receiver(BaseHTTPRequestHandler):
         except ValueError:
             self.reply(400)
             return
-        if self.headers.get('Transfer-Encoding') or not 0 < length <= LIMIT:
+        bound = 64 if verifying else LIMIT
+        if self.headers.get('Transfer-Encoding') or not 0 < length <= bound:
             self.reply(413)
             return
         try:
             body = self.rfile.read(length)
         except (TimeoutError, OSError):
             self.reply(408)
+            return
+        if verifying:
+            if length != 64 or body.decode('ascii', errors='replace') != self.session.expected_hash:
+                self.reply(422)
+                print('STAGE-HASH-MISMATCH: survey not approved.', flush=True)
+                return
+            self.session.stage_verified = True
+            self.reply(200, b'OK')
+            print('STAGE-HASH-VERIFIED: TV observed expected survey bytes.', flush=True)
             return
         if len(body) != length or not valid_report(body):
             self.reply(422)
@@ -161,7 +212,10 @@ def main() -> int:
     parser.add_argument('--timeout', type=int, default=300)
     parser.add_argument('--staged', action='store_true', help='Receive staged result, no executable GET')
     parser.add_argument('--write-stage', type=Path, help='Only render fixed survey to a private local file')
-    parser.add_argument('--stage-remote', help='Exact dedicated SDB staging path')
+    parser.add_argument('--stage-remote', help='Exact dedicated SDB loader path')
+    parser.add_argument('--body-remote', help='Exact dedicated SDB survey path')
+    parser.add_argument('--write-body', type=Path, help='New private survey file for SDB upload')
+    parser.add_argument('--staged-hash', help='Expected SHA-256 for one-use staged verification')
     args = parser.parse_args()
     host, tv = str(ipaddress.IPv4Address(args.host)), str(ipaddress.IPv4Address(args.tv))
     if not all(ipaddress.IPv4Address(value).is_private and not ipaddress.IPv4Address(value).is_loopback
@@ -171,23 +225,32 @@ def main() -> int:
         parser.error('Invalid session token or timeout')
     if args.write_stage:
         destination = args.write_stage.resolve()
+        body_destination = args.write_body.resolve() if args.write_body else None
         private_lab = (ROOT / '.local/tiz0wn-lab').resolve()
-        if private_lab not in destination.parents or destination.exists():
-            parser.error('Staged script must be a new file inside the private lab')
-        if not args.stage_remote:
-            parser.error('--stage-remote required to render the staged survey')
+        if (body_destination is None or destination == body_destination
+            or any(private_lab not in p.parents or p.exists()
+                   for p in (destination, body_destination))
+            or not args.stage_remote or not args.body_remote):
+            parser.error('Provide two new private files and both exact stage paths')
+        body = staged_body_text(host, args.token)
+        digest = hashlib.sha256(body).hexdigest()
         try:
-            payload = staged_command_text(host, args.token, args.stage_remote)
+            loader = staged_command_text(host, args.token, args.stage_remote,
+                                         args.body_remote, digest)
         except ValueError as exc:
             parser.error(str(exc))
-        destination.write_bytes(payload)
-        print('STAGE-RENDERED: fixed read-only survey prepared locally.', flush=True)
+        body_destination.write_bytes(body)
+        destination.write_bytes(loader)
+        print('STAGE-RENDERED: survey and checksum-gated loader prepared locally.', flush=True)
         return 0
     output = Path(args.output).resolve()
     if (ROOT / '.local/tiz0wn-lab').resolve() not in output.parents or output.exists():
         parser.error('Output must be a new private lab file')
     output.parent.mkdir(parents=True, exist_ok=True)
-    with SnapshotServer((host, 8181), tv, args.token, output, staged=args.staged) as server:
+    if args.staged and not re.fullmatch(r'[0-9a-f]{64}', args.staged_hash or ''):
+        parser.error('Staged receiver requires the expected survey SHA-256')
+    with SnapshotServer((host, 8181), tv, args.token, output,
+                        staged=args.staged, expected_hash=args.staged_hash) as server:
         print('Snapshot receiver ready; reconnect Remote PC and open Shared Folder once.', flush=True)
         deadline = time.monotonic() + args.timeout
         try:
