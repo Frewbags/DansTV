@@ -23,8 +23,8 @@ For the **QA65Q80TAWXXY / T-NKMUABC-2743.0** branch work, read
 and [`docs/q80t-finish-checklist.md`](docs/q80t-finish-checklist.md)
 before suggesting any device action.
 
-**21 Nov 2026 milestone:** the owner successfully obtained **one**
-checksum-gated, framed, read-only UID-0 report using
+**21 Nov 2026 milestone:** the owner successfully obtained **two**
+checksum-gated, framed, read-only UID-0 reports using
 `root-bridge.ps1 -Action PrepareStaged` followed by `-Action ListenStaged`,
 with SDB **push** of two files, one Remote PC/Shared Folder action,
 `STAGE-HASH-VERIFIED`, `SNAPSHOT-RECEIVED`, a successful local assessor,
@@ -32,7 +32,20 @@ and automatic restoration of dedicated host/XRDP credentials.
 **SDB pull was rejected on the TV and is not used in the working method.**
 The full report is **private under ignored `.local/tiz0wn-lab/`**;
 do not commit, share or print it or token-bearing paths.
-Do not rerun the trial just to analyse the saved snapshot.
+Do not rerun the trial just to analyse the saved snapshots.
+The installed DansTV app ID is `iN5p1j5y6b.DansTV`, not the
+tracked source manifest identity. The physical Home key still invokes
+Samsung `com.samsung.tv.csfs`. Read
+[`docs/q80t-home-backup.md`](docs/q80t-home-backup.md) before proposing
+any Home work. A read-only SQLite backup export and offline verifier
+are committed and tests pass, but the **TV export has not run**.
+At the evening 21 November handover, a new `PrepareStaged` session was
+active and had **not** been triggered; the owner was instructed to use
+`root-bridge.ps1 -Action Restore` before stopping. Do not assume
+Restore succeeded until its output is confirmed. A restored prepared
+session must be prepared again with a **new** session token.
+Claude UI changes (Blue and Emerald, neutral default) were merged
+into the owner's `feature/q80t-windows-setup` branch; preserve them.
 
 The older long-password `-Action Prepare` and separate
 `staged-snapshot.ps1` prototype are not the successful procedure.
