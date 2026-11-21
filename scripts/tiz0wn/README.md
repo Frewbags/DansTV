@@ -53,6 +53,24 @@ the previous trial. It is not a general root shell. See the
 [21 November offline status](../../docs/q80t-nov21-offline-status.md)
 and current [handover](../../docs/q80t-root-handover.md).
 
+### Experimental staged transport — not ready for use
+
+**Do not run `staged-snapshot.ps1 -Action Prepare` yet.** The new
+`staged-snapshot.py` and `staged-snapshot.ps1` helpers are an untested
+prototype; their current short-credential construction is inconsistent,
+and no Windows or Samsung hardware tests have been completed.
+Neither helper was run against the owner's TV. No claim of successful SDB
+staging, collection or XRDP restoration is made.
+
+The concept is to stage a fixed, read-only survey via SDB, verify its
+bytes with a read-back, perform one owner-operated Remote PC/Shared
+Folder action, retrieve a private report, and restore dedicated lab
+credentials. This design may still be blocked by firmware-specific SDB
+upload permissions or security labels. Correct and test the
+implementation in an authorised development environment before enabling
+any privileged trial. `root-bridge.ps1 -Action Doctor` remains the
+existing safe host-only preflight.
+
 ### Reference procedure: bounded snapshot trial (currently blocked)
 
 **Do not repeat the former long mixed-character password attempt as written.**
