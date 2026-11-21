@@ -55,6 +55,58 @@ class TransportTests(unittest.TestCase):
         self.assertEqual(self.output.read_bytes(), REPORT)
         self.assertEqual(self.request('POST', '/r/' + TOKEN, REPORT)[0], 409)
 
+    def test_staged_result_without_fetch_is_one_time_and_bound_to_token(self):
+        # Staging happened via a separately hash-checked SDB transfer.
+        self.server.served = True
+        self.assertEqual(self.fetch()[0], 409)
+        self.assertEqual(self.request('POST', '/r/' + 'b' * 24, REPORT)[0], 404)
+        self.assertEqual(self.request('POST', '/r/' + TOKEN,
+                                      REPORT.replace(b'EUID=0', b'EUID=901'))[0], 422)
+        self.assertEqual(self.request('POST', '/r/' + TOKEN, REPORT)[0], 204)
+        self.assertEqual(self.output.read_bytes(), REPORT)
+        self.assertEqual(self.request('POST', '/r/' + TOKEN, REPORT)[0], 409)
+
+    def test_staged_payload_is_content_form_and_path_constrained(self):
+        remote = '/home/owner/share/tmp/sdk_tools/dtvs' + TOKEN[:8] + '.sh'
+        result = bridge.staged_command_text('127.0.0.1', TOKEN, remote)
+        self.assertTrue(result.startswith(b'/bin/sh -c "$(printf %s '))
+        self.assertTrue(result.endswith(b'| /usr/bin/base64 -d)"\\n'))
+        self.assertNotIn(b'http://127.0.0.1', result)  # source body is encoded
+        import base64
+        encoded = result.split(b'printf %s ', 1)[1].split(b' |', 1)[0]
+        decoded = base64.b64decode(encoded, validate=True)
+        self.assertIn(b'DANSTV-ROOT-CHANNEL', decoded)
+        self.assertIn(b'http://127.0.0.1:8181/r/' + TOKEN.encode(), decoded)
+        self.assertIn(('rm -f ' + remote).encode(), decoded)
+        for bad in ('/tmp/test.sh', remote + ';id',
+                    '/home/owner/share/tmp/sdk_tools/other.sh'):
+            with self.assertRaises(ValueError):
+                bridge.staged_command_text('127.0.0.1', TOKEN, bad)
+
+    def test_staged_password_matches_verified_session(self):
+        lab = Path(self.directory.name)
+        remote = '/home/owner/share/tmp/sdk_tools/dtvs' + TOKEN[:8] + '.sh'
+        trigger = '$(eval${IFS}$(cat${IFS}' + remote + '))'
+        self.assertLessEqual(len(trigger), 90)
+        self.assertNotIn('<', trigger)
+        self.assertNotIn('|', trigger)
+        self.assertNotIn('&', trigger)
+        (lab / 'lab.env').write_text('TVPROBE_PASSWORD=' + trigger + '\\n', encoding='ascii')
+        (lab / 'lab.env.before-snapshot').touch()
+        (lab / 'ownership.json').write_text(json.dumps({
+            'pc': '192.0.2.10', 'tv': '192.0.2.20', 'user': 'danstvprobe',
+            'share': 'DansTVProbe'}), encoding='utf-8')
+        session = {
+            'token': TOKEN, 'host': '192.0.2.10', 'tv': '192.0.2.20',
+            'mode': 'Staged', 'stage_remote': remote,
+        }
+        (lab / 'snapshot-session.json').write_text(json.dumps(session), encoding='ascii')
+        self.assertEqual(paste.prepared_password(lab), trigger)
+        session['stage_remote'] = remote.replace(TOKEN[:8], 'b' * 8)
+        (lab / 'snapshot-session.json').write_text(json.dumps(session), encoding='ascii')
+        with self.assertRaises(ValueError):
+            paste.prepared_password(lab)
+
     def test_token_and_source_restrictions(self):
         self.assertEqual(self.request('GET', '/d/' + 'b' * 24)[0], 404)
         self.server.tv = '192.0.2.1'
