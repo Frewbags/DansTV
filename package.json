@@ -19,7 +19,7 @@
     "check:device": "node --test scripts/test-device.mjs",
     "check:performance": "node scripts/check-performance.mjs",
     "check:offline": "node scripts/run-python.mjs scripts/check-offline.py",
-    "check:home": "node scripts/run-python.mjs scripts/tiz0wn/check.py && node scripts/run-python.mjs scripts/tiz0wn/test_cleanup_plan.py && node scripts/run-python.mjs scripts/tiz0wn/test-root-bridge.py && node scripts/run-python.mjs scripts/tiz0wn/test_assess_snapshot.py",
+    "check:home": "node scripts/run-python.mjs scripts/tiz0wn/check.py && node scripts/run-python.mjs scripts/tiz0wn/test_cleanup_plan.py && node scripts/run-python.mjs scripts/tiz0wn/test-root-bridge.py && node scripts/run-python.mjs scripts/tiz0wn/test_assess_snapshot.py && node scripts/run-python.mjs scripts/tiz0wn/test_extract_home_backup.py",
     "win:preview": "node scripts/run-python.mjs scripts/preview.py --public-fonts",
     "win:check": "npm run check"
   },
