@@ -97,7 +97,7 @@ if ($Action -eq 'Doctor') {
     }
     Write-Output 'Q80T host diagnostic: passed model, firmware, owned lab, Python, Docker, share and free callback-port checks.'
     Write-Output 'No TV connection, account password changes, firewall rules or package operations were performed.'
-    Write-Output 'Next: run -Action Prepare only when ready for the owner-operated, reversible TV trial.'
+    Write-Output 'For the newer short-password workflow, use -Action PrepareStaged only when at the TV. The old Prepare mode is blocked pending review.'
     return
 }
 function Password([string]$file) {
