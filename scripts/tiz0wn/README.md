@@ -71,6 +71,83 @@ implementation in an authorised development environment before enabling
 any privileged trial. `root-bridge.ps1 -Action Doctor` remains the
 existing safe host-only preflight.
 
+### Preferred next Q80T trial — short staged snapshot (experimental)
+
+**This is a new, separately gated procedure.** It is not yet hardware-verified on the
+Q80T; it stops before credential rotation if SDB upload/readback or its SHA-256
+verification fails. A successful SDB transfer proves only that the SDK can
+read back the staged bytes, not that the privileged SMB shell can read or
+run them. No Home, firmware, service or startup state is changed.
+
+The new staged mode avoids a long mixed-character TV password. The short
+password consists of a built-in shell `eval` and `cat` of an SDB-staged,
+hash-verified one-line text-form survey. It uses only the measured
+`$()` and `${IFS}` grammar rather than the TV-rejected `<`, literal
+spaces or IME-dropped pipe character. The full survey is decoded and executed
+by the signed shell **from command content**, not through an executable
+script path (Tizen UEP can reject execution of uploaded files). The existing
+single-use LAN HTTP receiver is kept **only for report collection** because
+some retail Tizen firmware prohibits SDB file pulls. In staged mode, the
+receiver never supplies a downloadable root script.
+
+From **Administrator PowerShell** on the existing Windows host, with
+Docker Desktop running, run from the repository root:
+
+```powershell
+git pull --ff-only origin feature/q80t-windows-setup
+npm run check:home
+.\scripts\tiz0wn\root-bridge.ps1 -Action PrepareStaged
+```
+
+The script checks the exact Q80T model/firmware and existing disposable
+account/share, connects with SDB, uploads only the bounded survey to the
+owner SDK staging folder, **pulls that file back and compares its SHA-256**.
+Only after those gates pass does it back up and rotate the dedicated lab
+credentials, recreate the Docker XRDP service, check TCP/3389, and enable a
+TV-IP-only temporary listener rule. The short, temporary Remote PC password
+is printed locally. Do **not** paste passwords, tokens or private files into
+issues, logs or chat.
+
+In the same elevated PowerShell window, start the bounded report receiver:
+
+```powershell
+.\scripts\tiz0wn\root-bridge.ps1 -Action ListenStaged
+```
+
+Only then, on the TV, enter the displayed short password in Remote PC,
+connect and open **Shared Folder** once. The password may also be sent by
+`py scripts/tiz0wn/paste-password.py send` while that field is focused,
+although Samsung may not commit remote text entry; SmartThings input or
+manual entry can still be required. The receiver accepts one successful
+report from the configured TV IP and exact one-use token, prints a
+privacy-preserving assessment and **automatically runs Restore** when it
+ends. It times out after five minutes, then restores; it does not retry
+the TV trigger.
+
+If you have to interrupt or Prepare succeeds but Listen cannot be run,
+restore from Administrator PowerShell:
+
+```powershell
+.\scripts\tiz0wn\root-bridge.ps1 -Action Restore
+.\scripts\tiz0wn\root-bridge.ps1 -Action Doctor
+```
+
+Restore revokes the firewall rule and returns the ordinary dedicated lab
+credentials; normal TV Remote PC saved credentials may need updating. A
+staging file may remain if the TV never executed it or could not remove
+it; it is not a boot hook, but should be deleted through an independently
+verified owner-safe path later. Never run a stale staged trigger. If SDB
+`pull` is blocked, stop: **no password rotation or TV root attempt is
+performed** and the failed stage should be treated as untrusted. Report
+only the error message, not credentials.
+
+**Trust boundary:** The SDB-stage hash check closes *transfer* ambiguity but
+does not prove the file cannot be replaced on the TV before execution. The
+callback is restricted by TV IP, session token, a bounded body and report
+markers; these are **not cryptographic attestation** of the TV. Only use on
+the owner's isolated private network, and do not generalise this experimental
+read-only workflow into arbitrary commands or firmware writes.
+
 ### Reference procedure: bounded snapshot trial (currently blocked)
 
 **Do not repeat the former long mixed-character password attempt as written.**
