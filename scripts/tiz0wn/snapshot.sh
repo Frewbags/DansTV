@@ -111,7 +111,11 @@ fi
 printf '\n=== Candidate network socket counts (read-only, no endpoints) ===\n'
 if command -v ss >/dev/null 2>&1 && command -v systemctl >/dev/null 2>&1; then
     # One system snapshot, not eight changing separate observations.
-    socket_rows=$(ss -H -tunap 2>/dev/null) || socket_rows=''
+    socket_status=measured
+    socket_rows=$(ss -H -tunap 2>/dev/null) || socket_status=not_measured
+    if [ "$socket_status" = not_measured ]; then
+        printf 'ss could not inspect sockets; not measured\n'
+    else
     for unit in \
         acr.service adagent-service.service canalysis-service.service \
         contents-recognition-service.service media-analytics-service.service \
@@ -130,6 +134,7 @@ if command -v ss >/dev/null 2>&1 && command -v systemctl >/dev/null 2>&1; then
                 ;;
         esac
     done
+    fi
 else
     printf 'ss or systemctl unavailable; network observation not measured\n'
 fi
