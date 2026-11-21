@@ -71,82 +71,86 @@ implementation in an authorised development environment before enabling
 any privileged trial. `root-bridge.ps1 -Action Doctor` remains the
 existing safe host-only preflight.
 
-### Preferred next Q80T trial — short staged snapshot (experimental)
+### Preferred next Q80T trial — checksum-gated staged snapshot (experimental)
 
-**This is a new, separately gated procedure.** It is not yet hardware-verified on the
-Q80T; it stops before credential rotation if SDB upload/readback or its SHA-256
-verification fails. A successful SDB transfer proves only that the SDK can
-read back the staged bytes, not that the privileged SMB shell can read or
-run them. No Home, firmware, service or startup state is changed.
+**Owner-operated Q80T trial, not yet verified on this exact TV.**
+SDB `push` accepted the first survey on 21 November but this retail firmware
+rejected `sdb pull` with `You cannot pull files from this path`.
+The procedure below now **does not call SDB pull**.
 
-The new staged mode avoids a long mixed-character TV password. The short
-password consists of a built-in shell `eval` and `cat` of an SDB-staged,
-hash-verified one-line text-form survey. It uses only the measured
-`$()` and `${IFS}` grammar rather than the TV-rejected `<`, literal
-spaces or IME-dropped pipe character. The full survey is decoded and executed
-by the signed shell **from command content**, not through an executable
-script path (Tizen UEP can reject execution of uploaded files). The existing
-single-use LAN HTTP receiver is kept **only for report collection** because
-some retail Tizen firmware prohibits SDB file pulls. In staged mode, the
-receiver never supplies a downloadable root script.
+The host stages two unique files using SDB: a small, fixed loader and the
+read-only survey body. The owner enters the short temporary Remote PC password
+and opens Shared Folder once. The loader calculates the TV-side SHA-256 of
+the survey and sends **only that digest** to the previously reviewed,
+TV-IP-and-token-restricted LAN receiver. The receiver compares it with the
+original locally generated survey digest and responds with the single word
+`OK` only on an exact match. The loader runs the survey **only after that
+approval**, and the survey posts its bounded read-only report to the same
+receiver. The receiver accepts no downloadable executable in staged mode.
 
-From **Administrator PowerShell** on the existing Windows host, with
-Docker Desktop running, run from the repository root:
+This is **one TV interaction**, not a separate checksum login. The loader
+itself is trusted on the basis of a successful SDB upload on the owner's
+isolated network; it is not cryptographically attested and TV-specific UEP or
+SMACK rules may still prevent running it. No firmware, Home mapping, boot
+hook, system settings or installed application is modified.
+
+Before trying it, run the updated offline checks, including the Linux shell
+tests. An offline pass establishes source correctness on the test host, not
+a guaranteed TV result.
+
+From **Administrator PowerShell**, with Docker Desktop running:
 
 ```powershell
 git pull --ff-only origin feature/q80t-windows-setup
 npm run check:home
+docker run --rm -v "${PWD}:/repo" -w /repo python:3.12-bookworm python scripts/tiz0wn/test-root-bridge.py
+.\scripts\tiz0wn\root-bridge.ps1 -Action Doctor
+```
+
+When all checks pass, run:
+
+```powershell
 .\scripts\tiz0wn\root-bridge.ps1 -Action PrepareStaged
 ```
 
-The script checks the exact Q80T model/firmware and existing disposable
-account/share, connects with SDB, uploads only the bounded survey to the
-owner SDK staging folder, **pulls that file back and compares its SHA-256**.
-Only after those gates pass does it back up and rotate the dedicated lab
-credentials, recreate the Docker XRDP service, check TCP/3389, and enable a
-TV-IP-only temporary listener rule. The short, temporary Remote PC password
-is printed locally. Do **not** paste passwords, tokens or private files into
-issues, logs or chat.
+It stages both files, checks SDB upload acknowledgements, records the SHA-256,
+then rotates *only* the dedicated lab credentials, recreates XRDP, checks
+TCP/3389 and opens a one-session, TV-IP-restricted listener permission.
+It deliberately does **not** claim read-back verification.
 
-In the same elevated PowerShell window, start the bounded report receiver:
+Only when preparation reports `STAGED-READY`, run in the same elevated
+PowerShell session:
 
 ```powershell
 .\scripts\tiz0wn\root-bridge.ps1 -Action ListenStaged
 ```
 
-Only then, on the TV, enter the displayed short password in Remote PC,
-connect and open **Shared Folder** once. The password may also be sent by
-`py scripts/tiz0wn/paste-password.py send` while that field is focused,
-although Samsung may not commit remote text entry; SmartThings input or
-manual entry can still be required. The receiver accepts one successful
-report from the configured TV IP and exact one-use token, prints a
-privacy-preserving assessment and **automatically runs Restore** when it
-ends. It times out after five minutes, then restores; it does not retry
-the TV trigger.
+While the listener is running, use the displayed short password on the
+TV's existing Remote PC profile and open **Shared Folder once**.
+The receiver should print `STAGE-HASH-VERIFIED` before
+`SNAPSHOT-RECEIVED` and the privacy-preserving assessment. Collection ends
+by restoring the original lab credentials.
 
-If you have to interrupt or Prepare succeeds but Listen cannot be run,
-restore from Administrator PowerShell:
+If collection fails or times out, the script still invokes Restore.
+If a session is interrupted, run:
 
 ```powershell
 .\scripts\tiz0wn\root-bridge.ps1 -Action Restore
 .\scripts\tiz0wn\root-bridge.ps1 -Action Doctor
 ```
 
-Restore revokes the firewall rule and returns the ordinary dedicated lab
-credentials; normal TV Remote PC saved credentials may need updating. A
-staging file may remain if the TV never executed it or could not remove
-it; it is not a boot hook, but should be deleted through an independently
-verified owner-safe path later. Never run a stale staged trigger. If SDB
-`pull` is blocked, stop: **no password rotation or TV root attempt is
-performed** and the failed stage should be treated as untrusted. Report
-only the error message, not credentials.
+If the receiver never prints `STAGE-HASH-VERIFIED`, do not retry the
+temporary password or change Home. Report only its public status lines and
+verify credentials have returned to normal. Do not paste private reports,
+tokens, the TV password, signing settings or raw logs into chat.
 
-**Trust boundary:** The SDB-stage hash check closes *transfer* ambiguity but
-does not prove the file cannot be replaced on the TV before execution. The
-callback is restricted by TV IP, session token, a bounded body and report
-markers; these are **not cryptographic attestation** of the TV. Only use on
-the owner's isolated private network, and do not generalise this experimental
-read-only workflow into arbitrary commands or firmware writes.
+**Fallback / limits:** the TV must be able to read the SDB upload through
+the privileged Remote PC context and have `sha256sum`, `cut`, `curl`,
+`base64` and `/bin/sh` available. If any of those fail, no survey is
+approved, the receiver times out and restores credentials. That is a
+measured compatibility blocker, not an instruction to disable Samsung's
+security features. Files may remain in the SDK temporary directory.
+Never infer successful Home/boot control from a read-only survey.
 
 ### Reference procedure: bounded snapshot trial (currently blocked)
 
