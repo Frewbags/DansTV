@@ -70,7 +70,7 @@ def trigger_for(path: str) -> str:
         raise ValueError("Unexpected staged script path")
     # Literal Remote PC password, interpreted by the TV's affected
     # Shared Folder helper only after a successful RDP login.
-    trigger = "$(. " + path + ")"
+    trigger = "$(.${IFS}" + path + ")"
     if len(trigger) > 80:
         raise ValueError("Short trigger unexpectedly exceeds 80 characters")
     return trigger
@@ -134,8 +134,7 @@ def stage(tv: str) -> None:
             if result.returncode or "1 file(s) pushed" not in output or "failed" in output:
                 continue
             pull = call_sdb(sdb, ["-s", serial, "pull", remote, str(candidate)], check=False)
-            response = (pull.stdout + pull.stderr).lower()
-            if pull.returncode or "1 file(s) pulled" not in response or not candidate.is_file():
+            if pull.returncode or not candidate.is_file():
                 continue
             if hashlib.sha256(candidate.read_bytes()).digest() != hashlib.sha256(data).digest():
                 continue
@@ -177,8 +176,7 @@ def collect() -> None:
     serial = connect(sdb, record["tv"])
     try:
         pull = call_sdb(sdb, ["-s", serial, "pull", record["report_path"], str(pending)])
-        output = (pull.stdout + pull.stderr).lower()
-        if "1 file(s) pulled" not in output or not pending.is_file():
+        if pull.returncode != 0 or not pending.is_file():
             raise RuntimeError("No staged snapshot report is available yet")
         if not 0 < pending.stat().st_size <= LIMIT:
             raise RuntimeError("Report empty or exceeds size limit")
