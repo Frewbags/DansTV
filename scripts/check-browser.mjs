@@ -149,7 +149,7 @@ async function group(name) {
 }
 const settingsSnapshot = () => current.evaluate(() => {
   const s = ShoreQA.state();
-  const rendered = [...document.getElementById('stage').classList].filter(c => /^(bg|l|a|u|f|m|font)-/.test(c)).sort();
+  const rendered = [...document.getElementById('stage').classList].filter(c => /^(bg|l|a|u|f|m|ac|font)-/.test(c)).sort();
   return { stored: localStorage.getItem('cleanframe.home.v1'), committed: s.committed, shown: s.shown, rendered, writes: s.writes, storageAttempts: window.__storageAttempts };
 });
 const choice = (axis, value) => act('choice.' + axis + '.' + value);
@@ -770,7 +770,8 @@ try {
       ['layout', 'controls', ['text', 'both', 'icons']],
       ['typography', 'font', (await state()).fonts.available],
       ['focus', 'focus', ['type', 'glass']],
-      ['focus', 'material', ['frost', 'tint', 'soft']]
+      ['focus', 'material', ['frost', 'tint', 'soft']],
+      ['focus', 'accent', ['blue', 'violet', 'emerald', 'neutral']]
     ];
     for (const [name, axis, values] of specs) {
       await group(name);
@@ -781,7 +782,7 @@ try {
         const after = await settingsSnapshot(), rows = await radios();
         const expectedWrites = before.writes + (before.committed[axis] === value ? 0 : 1);
         const untouched = { ...after.committed, [axis]: before.committed[axis] };
-        const prefix = { bg: 'bg', layout: 'l', apps: 'a', controls: 'u', focus: 'f', material: 'm', font: 'font' }[axis];
+        const prefix = { bg: 'bg', layout: 'l', apps: 'a', controls: 'u', focus: 'f', material: 'm', accent: 'ac', font: 'font' }[axis];
         const shown = !Object.hasOwn(after.shown, axis) || after.shown[axis] === value;
         check(axis + ' OK applies ' + value + ' once', after.committed[axis] === value && shown && after.rendered.includes(prefix + '-' + value) && same(untouched, before.committed) && expectedWrites === after.writes && after.storageAttempts - before.storageAttempts === expectedWrites - before.writes && rows.some(r => r.action === 'choice.' + axis + '.' + value && r.checked === 'true'), { before, after, rows });
       }
