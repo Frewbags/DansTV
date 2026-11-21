@@ -2,6 +2,8 @@
 import http.client
 import importlib.util
 import json
+import hashlib
+import base64
 import os
 import shutil
 import socket
@@ -68,21 +70,31 @@ class TransportTests(unittest.TestCase):
 
     def test_staged_payload_is_content_form_and_path_constrained(self):
         remote = '/home/owner/share/tmp/sdk_tools/dtvs' + TOKEN[:8] + '.sh'
-        result = bridge.staged_command_text('127.0.0.1', TOKEN, remote)
+        body_remote = '/home/owner/share/tmp/sdk_tools/dtvb' + TOKEN[:8] + '.sh'
+        body = bridge.staged_body_text('127.0.0.1', TOKEN)
+        digest = hashlib.sha256(body).hexdigest()
+        result = bridge.staged_command_text('127.0.0.1', TOKEN, remote,
+                                             body_remote, digest)
         self.assertTrue(result.startswith(b'/bin/sh -c "$(printf %s '))
         self.assertTrue(result.endswith(b'| /usr/bin/base64 -d)"\n'))
-        self.assertNotIn(b'http://127.0.0.1', result)  # source body is encoded
-        import base64
+        self.assertNotIn(b'http://127.0.0.1', result)
         encoded = result.split(b'printf %s ', 1)[1].split(b' |', 1)[0]
         decoded = base64.b64decode(encoded, validate=True)
-        self.assertIn(b'DANSTV-ROOT-CHANNEL', decoded)
-        self.assertIn(b'http://127.0.0.1:8181/r/' + TOKEN.encode(), decoded)
-        self.assertIn(('rm -f ' + remote).encode(), decoded)
+        self.assertIn(b'sha256sum "$BODY"', decoded)
+        self.assertIn(b'http://127.0.0.1:8181/v/' + TOKEN.encode(), decoded)
+        self.assertIn(body_remote.encode(), decoded)
+        self.assertIn(b'DANSTV-ROOT-CHANNEL', body)
         for bad in ('/tmp/test.sh', remote + ';id',
                     '/home/owner/share/tmp/sdk_tools/other.sh'):
             with self.assertRaises(ValueError):
-                bridge.staged_command_text('127.0.0.1', TOKEN, bad)
-
+                bridge.staged_command_text('127.0.0.1', TOKEN, bad,
+                                           body_remote, digest)
+        with self.assertRaises(ValueError):
+            bridge.staged_command_text('127.0.0.1', TOKEN, remote,
+                                       body_remote + ';id', digest)
+        with self.assertRaises(ValueError):
+            bridge.staged_command_text('127.0.0.1', TOKEN, remote,
+                                       body_remote, '0' * 63)
     def test_staged_password_matches_verified_session(self):
         lab = Path(self.directory.name)
         remote = '/home/owner/share/tmp/sdk_tools/dtvs' + TOKEN[:8] + '.sh'
@@ -124,6 +136,64 @@ class TransportTests(unittest.TestCase):
         self.assertEqual(run.returncode, 0, run.stderr)
         self.assertEqual(run.stdout, b'')
         self.assertEqual(target.read_text(), 'STAGED_OK')
+
+    def test_staged_receiver_blocks_report_until_hash_confirmed(self):
+        expected = hashlib.sha256(b'safe fixed survey').hexdigest()
+        self.server.expected_hash = expected
+        self.server.stage_verified = False
+        self.server.served = True
+        self.assertEqual(self.request('POST', '/r/' + TOKEN, REPORT)[0], 409)
+        self.assertEqual(self.request('POST', '/v/' + ('b' * 24),
+                                      expected.encode())[0], 404)
+        self.assertEqual(self.request('POST', '/v/' + TOKEN,
+                                      b'0' * 64)[0], 422)
+        self.assertFalse(self.output.exists())
+        status, body = self.request('POST', '/v/' + TOKEN, expected.encode())
+        self.assertEqual((status, body), (200, b'OK'))
+        self.assertEqual(self.request('POST', '/v/' + TOKEN,
+                                      expected.encode())[0], 409)
+        self.assertEqual(self.request('POST', '/r/' + TOKEN, REPORT)[0], 204)
+        self.assertEqual(self.output.read_bytes(), REPORT)
+
+    @unittest.skipUnless(os.name == 'posix' and shutil.which('bash') and
+                         shutil.which('sha256sum') and Path('/usr/bin/curl').exists(),
+                         'staged checksum shell rehearsal requires Linux')
+    def test_staged_loader_requires_tv_observed_checksum(self):
+        # Simulate the loader and receiver against synthetic files, not TV.
+        approved_body = b'printf APPROVED > "$DANSTV_TEST_RESULT"\n'
+        self.server.expected_hash = hashlib.sha256(approved_body).hexdigest()
+        self.server.stage_verified = False
+        self.server.served = True
+        remote = '/home/owner/share/tmp/sdk_tools/dtvs' + TOKEN[:8] + '.sh'
+        body_remote = '/home/owner/share/tmp/sdk_tools/dtvb' + TOKEN[:8] + '.sh'
+        local_body = Path(self.directory.name) / 'body.sh'
+        local_stage = Path(self.directory.name) / 'stage.sh'
+        target = Path(self.directory.name) / 'executed.txt'
+        local_body.write_bytes(approved_body)
+        original = bridge.staged_command_text('127.0.0.1', TOKEN, remote,
+                                               body_remote, self.server.expected_hash)
+        encoded = original.split(b'printf %s ', 1)[1].split(b' |', 1)[0]
+        source = base64.b64decode(encoded).decode('ascii')
+        source = source.replace(body_remote, str(local_body))
+        source = source.replace(':8181/v/', ':' + str(self.server.server_address[1]) + '/v/')
+        runtime_encoded = base64.b64encode(source.encode('ascii')).decode('ascii')
+        local_stage.write_text('/bin/sh -c "$(printf %s ' + runtime_encoded +
+                               ' | /usr/bin/base64 -d)"\n', encoding='ascii')
+        env = os.environ.copy()
+        env['DANSTV_TEST_RESULT'] = str(target)
+
+        local_body.write_bytes(b'printf UNSAFE > "$DANSTV_TEST_RESULT"\n')
+        first = subprocess.run(['bash', str(local_stage)], env=env,
+                               capture_output=True, timeout=15)
+        self.assertFalse(target.exists())
+        self.assertFalse(self.server.stage_verified)
+
+        local_body.write_bytes(approved_body)
+        second = subprocess.run(['bash', str(local_stage)], env=env,
+                                capture_output=True, timeout=15)
+        self.assertEqual(second.returncode, 0, second.stderr)
+        self.assertEqual(target.read_text(), 'APPROVED')
+        self.assertTrue(self.server.stage_verified)
 
     def test_token_and_source_restrictions(self):
         self.assertEqual(self.request('GET', '/d/' + 'b' * 24)[0], 404)
