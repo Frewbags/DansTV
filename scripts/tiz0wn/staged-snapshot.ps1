@@ -21,9 +21,7 @@ if ($owner.user -ne 'danstvprobe' -or $owner.share -ne 'DansTVProbe') {
 }
 foreach ($address in @($owner.pc, $owner.tv)) {
     $ip = [Net.IPAddress]::Parse($address)
-    if ($ip.AddressFamily -ne [Net.Sockets.AddressFamily]::InterNetwork -or
-        -not $ip.IsIPv4MappedToIPv6 -eq $false) {
-        # IPv4 validation is sufficient; never assume an Internet/public target.
+    if ($ip.AddressFamily -ne [Net.Sockets.AddressFamily]::InterNetwork) {
         throw 'Unexpected IP family; owner lab needs IPv4 addresses.'
     }
 }
@@ -99,11 +97,11 @@ if ($Action -eq 'Restore') {
         Remove-Item -LiteralPath $backup -Force
     }
     if ($hasSession) { Remove-Item -LiteralPath $sessionFile -Force }
-    if ($hasBackup) { Write-Output 'RESTORED: original Windows/XPDR credentials and ready XRDP listener.' }
+    if ($hasBackup) { Write-Output 'RESTORED: original Windows/XRDP credentials and ready XRDP listener.' }
     else { Write-Output 'No staged credential backup; no lab credentials changed.' }
     return
 }
-if (Test-Path -LiteralPath $backup -PathType Leaf -and $Action -eq 'Doctor') {
+if ((Test-Path -LiteralPath $backup -PathType Leaf) -and $Action -eq 'Doctor') {
     throw 'An earlier staged session is active; use Restore or Collect before Doctor.'
 }
 if ($Action -eq 'Collect') {
