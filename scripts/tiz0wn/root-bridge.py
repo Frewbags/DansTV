@@ -259,7 +259,12 @@ def main() -> int:
         except KeyboardInterrupt:
             return 130
         if not server.received:
-            print('NO-REPORT: no validated root result; session has stopped.', flush=True)
+            if args.staged and server.stage_verified:
+                print('STAGE-VERIFIED-NO-REPORT: survey bytes matched, but no completed root report.', flush=True)
+            elif args.staged:
+                print('NO-STAGE-VERIFICATION: no valid checksum approval reached the receiver.', flush=True)
+            else:
+                print('NO-REPORT: no validated root result; session has stopped.', flush=True)
             return 1
     metadata = {'received_utc': datetime.now(timezone.utc).isoformat(), 'mode': 'Snapshot',
                 'euid': 0, 'exit_status': 0, 'hardware_validation': 'pending owner review'}
