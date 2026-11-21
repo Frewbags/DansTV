@@ -185,36 +185,36 @@ if ($Action -eq 'PrepareStaged') {
     try { $rng.GetBytes($bytes) } finally { $rng.Dispose() }
     $token = ([BitConverter]::ToString($bytes) -replace '-','').ToLowerInvariant()
     $stageRemote = '/home/owner/share/tmp/sdk_tools/dtvs' + $token.Substring(0,8) + '.sh'
+    $surveyRemote = '/home/owner/share/tmp/sdk_tools/dtvb' + $token.Substring(0,8) + '.sh'
     $stageLocal = Join-Path $lab ('stage-' + $token + '.sh')
-    $stageVerified = Join-Path $lab ('stage-verified-' + $token + '.sh')
+    $surveyLocal = Join-Path $lab ('survey-' + $token + '.sh')
     $report = Join-Path $lab ('snapshot-' + $token + '.txt')
-    try {
-        & py -3 (Join-Path $PSScriptRoot 'root-bridge.py') --host $owner.pc --tv $owner.tv --token $token --output $report --write-stage $stageLocal --stage-remote $stageRemote | Out-Null
-        if ($LASTEXITCODE -ne 0) { throw 'Unable to prepare the fixed survey in the private lab.' }
-        $serial = ([string]$owner.tv) + ':26101'
-        & $sdb connect $serial | Out-Null
-        if ($LASTEXITCODE -ne 0) { throw 'SDB connection to Q80T failed; no credentials changed.' }
-        $state = ((& $sdb -s $serial get-state 2>&1) | Out-String).Trim()
-        if ($LASTEXITCODE -ne 0 -or $state -ne 'device') {
-            throw 'Q80T SDB transport is not ready; no credentials changed.'
-        }
-        & $sdb -s $serial push $stageLocal $stageRemote | Out-Null
-        if ($LASTEXITCODE -ne 0) { throw 'TV refused the SDB survey staging path; no credentials changed.' }
-        & $sdb -s $serial pull $stageRemote $stageVerified | Out-Null
-        if ($LASTEXITCODE -ne 0 -or -not (Test-Path -LiteralPath $stageVerified)) {
-            throw 'TV SDB pull/readback unavailable; no credentials changed. Do not continue with an unverified staged file.'
-        }
-        $expected = (Get-FileHash -LiteralPath $stageLocal -Algorithm SHA256).Hash
-        $actual = (Get-FileHash -LiteralPath $stageVerified -Algorithm SHA256).Hash
-        if ($expected -cne $actual) {
-            throw 'SDB staged script hash differs from the original; no credentials changed.'
-        }
-    } finally {
-        if (Test-Path -LiteralPath $stageVerified) {
-            Remove-Item -LiteralPath $stageVerified -Force
+    # Render two files locally. SDB pull is forbidden on this retail firmware,
+    # so the short loader will ask the receiver to approve the TV-observed
+    # SHA-256 of the separate read-only survey BEFORE running the survey.
+    & py -3 (Join-Path $PSScriptRoot 'root-bridge.py') --host $owner.pc --tv $owner.tv --token $token --output $report --write-stage $stageLocal --stage-remote $stageRemote --write-body $surveyLocal --body-remote $surveyRemote | Out-Null
+    if ($LASTEXITCODE -ne 0) { throw 'Unable to prepare the fixed private staged files.' }
+    $expectedSurveyHash = (Get-FileHash -LiteralPath $surveyLocal -Algorithm SHA256).Hash.ToLowerInvariant()
+    if ($expectedSurveyHash -notmatch '^[0-9a-f]{64}$') {
+        throw 'Expected survey digest unavailable; lab credentials unchanged.'
+    }
+    $serial = ([string]$owner.tv) + ':26101'
+    & $sdb connect $serial | Out-Null
+    if ($LASTEXITCODE -ne 0) { throw 'SDB connection to Q80T failed; no credentials changed.' }
+    $state = ((& $sdb -s $serial get-state 2>&1) | Out-String).Trim()
+    if ($LASTEXITCODE -ne 0 -or $state -ne 'device') {
+        throw 'Q80T SDB transport is not ready; no credentials changed.'
+    }
+    foreach ($item in @(@($surveyLocal, $surveyRemote), @($stageLocal, $stageRemote))) {
+        # Use a fresh unique remote name; do not overwrite any TV system file.
+        $transfer = ((& $sdb -s $serial push $item[0] $item[1] 2>&1) | Out-String)
+        if ($LASTEXITCODE -ne 0 -or $transfer -notmatch '1 file\(s\) pushed' -or
+            $transfer -match '(?i)failed|permission denied') {
+            throw 'TV did not confirm SDB upload of both private files; credentials unchanged.'
         }
     }
-
+    # The staged survey remains inert unless the owner later enters the
+    # short TV credential and the one-time receiver approves its SHA-256.
     # The password carries only a short fixed-script invocation, never the
     # survey body, URL, network address or a long combined shell expression.
     $probe = '$(eval${IFS}$(cat${IFS}' + $stageRemote + '))'
@@ -223,7 +223,8 @@ if ($Action -eq 'PrepareStaged') {
     try {
         [ordered]@{
             token=$token; host=$owner.pc; tv=$owner.tv; output=$report;
-            mode='Staged'; stage_remote=$stageRemote
+            mode='Staged'; stage_remote=$stageRemote; survey_remote=$surveyRemote;
+            survey_sha256=$expectedSurveyHash
         } | ConvertTo-Json | Set-Content -LiteralPath $sessionFile -Encoding ASCII
         Rotate $probe
         Assert-XrdpListening
@@ -235,7 +236,7 @@ if ($Action -eq 'PrepareStaged') {
         }
         throw
     }
-    Write-Output 'STAGED-READY: TV script readback verified; XRDP TCP listener ready.'
+    Write-Output 'STAGED-READY: both SDB uploads accepted; TV checksum will be verified before the read-only survey runs. XRDP TCP listener ready.'
     Write-Output 'Temporary TV Remote PC password (do not share it or lab.env):'
     Write-Output $probe
     Write-Output 'Next: run root-bridge.ps1 -Action ListenStaged, then open Remote PC and Shared Folder once.'
@@ -285,7 +286,21 @@ if ($session.host -ne $owner.pc -or $session.tv -ne $owner.tv -or $session.token
 }
 try {
     $argsForReceiver = @('--host', [string]$session.host, '--tv', [string]$session.tv, '--token', [string]$session.token, '--output', [string]$session.output)
-    if ($Action -eq 'ListenStaged') { $argsForReceiver += '--staged' }
+    if ($Action -eq 'ListenStaged') {
+        if ($session.survey_sha256 -notmatch '^[0-9a-f]{64}
+    & py -3 (Join-Path $PSScriptRoot 'root-bridge.py') @argsForReceiver
+    if ($LASTEXITCODE -ne 0) { throw 'No validated snapshot received.' }
+    & py -3 (Join-Path $PSScriptRoot 'assess-snapshot.py') --report $session.output
+    if ($LASTEXITCODE -ne 0) { throw 'Snapshot saved but assessment did not pass.' }
+} finally {
+    # Listener is synchronous and has exited. Credentials remain recoverable on failure.
+    & $PSCommandPath -Action Restore
+}
+) {
+            throw 'Staged survey SHA-256 missing; restore credentials without running TV trial.'
+        }
+        $argsForReceiver += @('--staged', '--staged-hash', [string]$session.survey_sha256)
+    }
     & py -3 (Join-Path $PSScriptRoot 'root-bridge.py') @argsForReceiver
     if ($LASTEXITCODE -ne 0) { throw 'No validated snapshot received.' }
     & py -3 (Join-Path $PSScriptRoot 'assess-snapshot.py') --report $session.output
