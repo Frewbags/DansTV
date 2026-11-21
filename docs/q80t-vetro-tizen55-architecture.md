@@ -1,5 +1,5 @@
 # DansTV Q80T — Tizen 5.5 root integration architecture review
-Date: 21 November 2026. Status: **design and offline evidence only**.
+Date: 21 November 2026. Status: **architecture review with a subsequent real Q80T read-only snapshot** (see [verified evidence](q80t-nov21-snapshot-success.md)); no privileged service installed.
 Target: Samsung QA65Q80TAWXXY, T-NKMUABC-2743.0, ARMv7, Tizen 5.5.
 DansTV branch: `feature/q80t-windows-setup`.
 
@@ -18,7 +18,7 @@ DansTV branch: `feature/q80t-windows-setup`.
 | --- | --- | --- | --- |
 | UI | Static WGT / `app/main.js`, public `window.tizen` APIs | Dashboard, launcher and service | **Retain DansTV**; do not transplant Vetro UX |
 | Ordinary app launch and HDMI | `app/device.js` | Vetro app controls | **Retain existing public API path** and its mock tests |
-| Initial privilege | One Q80T UID-0 Remote PC/SMB proof; long snapshot not completed | Expects externally provisioned root | **Independent blocker**, not solved by fork |
+| Initial privilege | Q80T checksum-gated Remote PC/Shared Folder **full read-only snapshot received once** | Expects externally provisioned root | **One bounded diagnostic is proven; persistent privileged service remains separate** |
 | Broker/service boundary | No installed privileged service | Node 4-oriented adapter with private bootstrap, loopback session, HMAC results, sequence numbers | **Reference contract**, not ready-to-install Q80T code |
 | Privileged process and shell queue | Not provisioned | Root-owned broker/agent and separately provisioned queue | **Require target-specific ownership, SMACK and startup evidence** |
 | Home/remote remap | Guarded research, not deployed | Separate .NET 3.0 launcher on reported TU7000, **not published** in this branch | **Do not borrow foreign model mapping or binary** |
@@ -46,7 +46,7 @@ DansTV branch: `feature/q80t-windows-setup`.
 
 A. **Now (no TV required):** preserve the current widget unchanged, review Curtis's protocol and runtime constraints, add conservative compatibility evidence to the read-only snapshot assessor, and run synthetic tests (including incomplete/misleading evidence cases). No package, credential, network or registry mutation.
 
-B. **Next Q80T session:** get the TV's normal RDP/SMB baseline and a complete read-only snapshot; verify the actual runtime and process identity separately. Do not infer a running Node service from the presence of an executable. Re-check credential transport independently before any further long/mixed-character diagnostic.
+B. **Now, using saved Q80T evidence:** privately inspect the complete 21 November read-only snapshot, determine original Home settings and native-operation gaps, and independently verify runtime/process identity if a service is considered. Do not infer a working Node web service or broker from a shell executable. There is no need to repeat the failed long mixed-character credential experiment.
 
 C. **Only with proved runtime + identity:** design an optional, inert-by-default service adapter, using a single authenticated loopback session and no web-exposed arbitrary command endpoint. Unit-test disconnects, invalid MAC, replays, limits, timeout outcome, and error reporting on synthetic transport before TV deployment.
 
@@ -54,12 +54,12 @@ D. **Only with independent recovery:** inspect exact Home routing, preserve type
 
 ## Current acceptance state
 
-- UID-0 proof: **one earlier Q80T observation**.
-- Complete read-only snapshot: **not obtained**.
+- UID-0 proof: **one earlier Q80T observation** (16 Nov).
+- Complete read-only snapshot: **obtained once on actual Q80T, 21 Nov**; TV-side survey hash verified, report received, and disposable lab credentials restored.
 - Signed Q80T Node runtime/SMACK compatibility: **unknown**.
 - Broker provisioning/agent authentication on Q80T: **not done**.
 - Q80T native Home and launcher mapping: **not demonstrated**.
 - Persistence and recovery: **not demonstrated**.
 - TV modifications in this review: **none**.
 
-The next *implementable* milestone is a validated read-only evidence report, not a persistent root installation.
+The next milestone is **private analysis of the already validated read-only evidence**, followed by independent off-TV Home backups and recovery planning. A persistent root installation remains out of scope.
