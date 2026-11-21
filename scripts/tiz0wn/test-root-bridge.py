@@ -70,7 +70,7 @@ class TransportTests(unittest.TestCase):
         remote = '/home/owner/share/tmp/sdk_tools/dtvs' + TOKEN[:8] + '.sh'
         result = bridge.staged_command_text('127.0.0.1', TOKEN, remote)
         self.assertTrue(result.startswith(b'/bin/sh -c "$(printf %s '))
-        self.assertTrue(result.endswith(b'| /usr/bin/base64 -d)"\\n'))
+        self.assertTrue(result.endswith(b'| /usr/bin/base64 -d)"\n'))
         self.assertNotIn(b'http://127.0.0.1', result)  # source body is encoded
         import base64
         encoded = result.split(b'printf %s ', 1)[1].split(b' |', 1)[0]
@@ -91,7 +91,7 @@ class TransportTests(unittest.TestCase):
         self.assertNotIn('<', trigger)
         self.assertNotIn('|', trigger)
         self.assertNotIn('&', trigger)
-        (lab / 'lab.env').write_text('TVPROBE_PASSWORD=' + trigger + '\\n', encoding='ascii')
+        (lab / 'lab.env').write_text('TVPROBE_PASSWORD=' + trigger + '\n', encoding='ascii')
         (lab / 'lab.env.before-snapshot').touch()
         (lab / 'ownership.json').write_text(json.dumps({
             'pc': '192.0.2.10', 'tv': '192.0.2.20', 'user': 'danstvprobe',
@@ -116,7 +116,7 @@ class TransportTests(unittest.TestCase):
         contents = 'printf STAGED_OK > "$DANSTV_TEST_RESULT"'
         encoded = base64.b64encode(contents.encode('ascii')).decode('ascii')
         stage.write_text('/bin/sh -c "$(printf %s ' + encoded +
-                         ' | /usr/bin/base64 -d)"\\n', encoding='ascii')
+                         ' | /usr/bin/base64 -d)"\n', encoding='ascii')
         trigger = '$(eval${IFS}$(cat${IFS}' + str(stage) + '))'
         env = os.environ.copy()
         env['DANSTV_TEST_RESULT'] = str(target)
