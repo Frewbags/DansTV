@@ -107,6 +107,24 @@ class TransportTests(unittest.TestCase):
         with self.assertRaises(ValueError):
             paste.prepared_password(lab)
 
+    @unittest.skipUnless(os.name == 'posix' and shutil.which('bash') and shutil.which('base64'),
+                         'shell grammar rehearsal requires Linux bash and base64')
+    def test_short_trigger_executes_staged_content_without_stdout(self):
+        import base64
+        stage = Path(self.directory.name) / 'stage.sh'
+        target = Path(self.directory.name) / 'result.txt'
+        contents = 'printf STAGED_OK > "$DANSTV_TEST_RESULT"'
+        encoded = base64.b64encode(contents.encode('ascii')).decode('ascii')
+        stage.write_text('/bin/sh -c "$(printf %s ' + encoded +
+                         ' | /usr/bin/base64 -d)"\\n', encoding='ascii')
+        trigger = '$(eval${IFS}$(cat${IFS}' + str(stage) + '))'
+        env = os.environ.copy()
+        env['DANSTV_TEST_RESULT'] = str(target)
+        run = subprocess.run(['bash', '-c', trigger], env=env, capture_output=True, timeout=10)
+        self.assertEqual(run.returncode, 0, run.stderr)
+        self.assertEqual(run.stdout, b'')
+        self.assertEqual(target.read_text(), 'STAGED_OK')
+
     def test_token_and_source_restrictions(self):
         self.assertEqual(self.request('GET', '/d/' + 'b' * 24)[0], 404)
         self.server.tv = '192.0.2.1'
