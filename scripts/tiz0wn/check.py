@@ -6,6 +6,9 @@ No device connection, shell, or privileged operation is performed.
 from pathlib import Path
 import re
 import sqlite3
+import os
+import shutil
+import subprocess
 
 ROOT = Path(__file__).resolve().parent
 HOME = (ROOT / "home-ctx.sh").read_text(encoding="utf-8")
@@ -61,6 +64,29 @@ assert "if ($hadSession -and -not $hadBackup)" in BRIDGE, "Preserve unknown cred
 rotate = BRIDGE.split("function Rotate(", 1)[1].split("if ($Action -eq 'Restore')", 1)[0]
 assert rotate.index("Assert-DockerReady") < rotate.index("Set-LocalUser")
 assert "Invoke-LabCompose -composeArgs @('config', '--quiet')" in rotate
+
+# On Windows, parse the actual PowerShell sources before any device operation.
+# Purely syntactic: the scripts are never executed by this check.
+if os.name == "nt":
+    executable = shutil.which("powershell.exe") or shutil.which("pwsh.exe")
+    assert executable, "PowerShell parser unavailable on this Windows host"
+    for filename in ("root-bridge.ps1", "staged-snapshot.ps1"):
+        source_path = str((ROOT / filename).resolve()).replace("'", "''")
+        parser_command = (
+            "$tokens=$null; $parseErrors=$null; "
+            "[System.Management.Automation.Language.Parser]::ParseFile("
+            "'" + source_path + "', [ref]$tokens, [ref]$parseErrors) | Out-Null; "
+            "if ($parseErrors.Count -gt 0) { "
+            "$parseErrors | ForEach-Object { Write-Output $_.Message }; exit 1 }"
+        )
+        result = subprocess.run(
+            [executable, "-NoProfile", "-NonInteractive", "-Command", parser_command],
+            capture_output=True, text=True, timeout=30,
+        )
+        assert result.returncode == 0, (
+            f"PowerShell syntax error in {filename}: " +
+            (result.stdout + result.stderr).strip()
+        )
 
 # Extract actual SQL strings from the checked-in shell script, then execute them
 # in an isolated SQLite fixture. This catches misspelled columns/conditions and
