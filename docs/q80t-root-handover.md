@@ -9,6 +9,84 @@ See [verified hardware milestone](q80t-nov21-snapshot-success.md),
 [operating procedure](../scripts/tiz0wn/README.md) and
 [completion checklist](q80t-finish-checklist.md).
 
+## Evening handover — 21 November 2026
+
+**Current priority: physical Home button → installed DansTV.**
+Telemetry cleanup is paused until after Home routing is addressed.
+
+- **Two read-only Q80T root snapshots** were successfully received with
+  `STAGE-HASH-VERIFIED`, `SNAPSHOT-RECEIVED`, and credential restoration.
+  Both were reviewed. The second includes concrete unit dependencies for
+  eight telemetry candidates, documented in
+  [q80t-telemetry-audit.md](q80t-telemetry-audit.md); socket counts were
+  **not measured** because the tool was unavailable on the TV.
+- The TV's actual Home mapping is in the SQLite
+  `/opt/dbspace/.app-context.db`:
+  `com.samsung.tv.csfs` / `XF86Home` / `launch` /
+  `package:com.samsung.tv.csfs` /
+  `entry_point:smarthub_key`. The native main-operation handler and
+  reload behaviour are **not** verified.
+- The **installed** DansTV application ID found through SDB `applist` is
+  `iN5p1j5y6b.DansTV`. This differs from the tracked source manifest's
+  `nClrkHome1.FrameHome`. A direct SDB launch of the source ID was
+  rejected, so use the installed ID only for future planning.
+  Ordinary `sdb shell ... sqlite3` yielded no output and exit 0;
+  this **did not** verify database access.
+- The checksum-gated `snapshot.sh` now contains a bounded,
+  **read-only** consistent SQLite `.backup` export, Base64-encoded inside
+  the **private** snapshot, plus a local, fail-closed
+  `extract-home-backup.py` SHA-256/SQLite/Home-row verifier. See
+  [q80t-home-backup.md](q80t-home-backup.md).
+- The Windows SQLite test fixture failure was corrected at commit
+  `75874d8`. Owner reran `npm run check:home`: static safeguards,
+  9 cleanup tests, 15 transport tests (3 Windows-only skips), 7
+  assessor tests, and **7/7 Home-backup tests passed**. Shell syntax
+  check also returned successfully. **Actual Home database export
+  has not been run or hardware-verified.**
+- Claude's local `feature/claude-ui` work (Blue and Emerald theme
+  options; neutral default) was reported committed as `f63a89d`
+  and subsequently merged/pushed by the owner; UI-file changes are
+  visible on the GitHub `feature/q80t-windows-setup` branch.
+  Keep UI work isolated from privileged/root changes.
+
+### Session state at stopping point
+
+The owner ran `root-bridge.ps1 -Action PrepareStaged` for a **third**
+diagnostic session and saw `STAGED-READY`, but explicitly deferred
+the `ListenStaged` and Remote PC/Shared Folder trigger until tomorrow.
+At this point temporary Windows/XRDP lab credentials and a temporary
+callback firewall rule **may still be active**. The assistant instructed
+the owner to run, **now**, from Administrator PowerShell:
+
+```powershell
+cd C:\Users\Daniel\DansTV
+.\scripts\tiz0wn\root-bridge.ps1 -Action Restore
+```
+
+**Do not mark Restore complete until the owner's output confirms it.**
+Avoid leaving the prepared temporary session active overnight. Restore
+cancels the unexecuted staged session, so a **fresh**
+`PrepareStaged` must be performed tomorrow.
+
+### Next session — shortest safe route
+
+1. Confirm `-Action Restore` succeeded, and run `-Action Doctor`.
+   Ensure the TV's saved Remote PC credential is changed back to its
+   normal lab value if needed. Never paste passwords, lab.env,
+   the raw snapshot or other private identifiers into GitHub.
+2. Fresh `-Action PrepareStaged`; start `-Action ListenStaged`;
+   owner connects Samsung Remote PC with **that session's** temporary
+   password and opens Shared Folder **once**.
+3. After `STAGE-HASH-VERIFIED` and `SNAPSHOT-RECEIVED`,
+   locate the *new* private snapshot path and run
+   `py -3 .\scripts\tiz0wn\extract-home-backup.py <PRIVATE_SNAPSHOT_PATH>`
+   on the owner's Windows PC. Check **HOME-BACKUP-VERIFIED**,
+   original Home row, full SHA-256 and saved `.home.db`.
+   A successful snapshot alone is **not** proof of backup.
+4. Establish a truly **independent** recovery route and check the
+   native handler/reload behaviour before *any* Home DB write.
+   `home-ctx.sh apply` remains **not approved**.
+
 ## What actually worked
 
 On 21 November, the owner completed a single checksum-gated
