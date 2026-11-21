@@ -157,6 +157,7 @@ if ($Action -eq 'Restore') {
     }
     if ($hadBackup) {
         Rotate (Password $backup)
+        Assert-XrdpListening
         Remove-Item -LiteralPath $backup
     }
     if ($hadSession) { Remove-Item -LiteralPath $sessionFile }
