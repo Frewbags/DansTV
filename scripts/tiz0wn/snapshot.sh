@@ -139,4 +139,51 @@ else
     printf 'ss or systemctl unavailable; network observation not measured\n'
 fi
 
+# Consistent SQLite backup of only the Home context database.
+# Source is opened read-only. A private transient copy under /tmp is removed
+# before this shell exits; nothing is written to the live Home database.
+# The encoded backup stays inside the private one-use report; never commit it.
+printf '\n=== Home DB verified backup export ===\n'
+if command -v sqlite3 >/dev/null 2>&1 &&
+   command -v mktemp >/dev/null 2>&1 &&
+   command -v sha256sum >/dev/null 2>&1 &&
+   command -v base64 >/dev/null 2>&1 &&
+   [ -r /opt/dbspace/.app-context.db ]; then
+    home_tmp=$(mktemp /tmp/.danstv-homedb-XXXXXXXX) || home_tmp=''
+    if [ -n "$home_tmp" ]; then
+        trap 'rm -f "$home_tmp"' EXIT HUP INT TERM
+        if sqlite3 -readonly /opt/dbspace/.app-context.db ".backup '$home_tmp'" >/dev/null 2>&1; then
+            home_check=$(sqlite3 -readonly "$home_tmp" 'PRAGMA quick_check;' 2>/dev/null) || home_check=''
+            home_row=$(sqlite3 -readonly -separator '|' "$home_tmp" "SELECT target_selector,args FROM key_filter WHERE appid='com.samsung.tv.csfs' AND key='XF86Home' AND request='launch';" 2>/dev/null) || home_row=''
+            home_size=$(wc -c < "$home_tmp" | tr -d '[:space:]')
+            case "$home_size" in
+                ''|*[!0-9]*) home_size=0 ;;
+            esac
+            if [ "$home_check" = ok ] &&
+               [ "$home_row" = 'package:com.samsung.tv.csfs|entry_point:smarthub_key' ] &&
+               [ "$home_size" -ge 1024 ] && [ "$home_size" -le 262144 ]; then
+                home_hash=$(sha256sum "$home_tmp" | cut -d ' ' -f1)
+                case "$home_hash" in
+                    *[!0-9a-f]*|'') printf 'HOME-DB-UNAVAILABLE hash_failed\n' ;;
+                    *)
+                        printf 'HOME-DB-BEGIN sha256=%s bytes=%s\n' "$home_hash" "$home_size"
+                        base64 "$home_tmp" || printf 'HOME-DB-ENCODING-FAILED\n'
+                        printf 'HOME-DB-END\n'
+                        ;;
+                esac
+            else
+                printf 'HOME-DB-UNAVAILABLE integrity_or_original_row_mismatch\n'
+            fi
+        else
+            printf 'HOME-DB-UNAVAILABLE sqlite_backup_failed\n'
+        fi
+        rm -f "$home_tmp"
+        trap - EXIT HUP INT TERM
+    else
+        printf 'HOME-DB-UNAVAILABLE mktemp_failed\n'
+    fi
+else
+    printf 'HOME-DB-UNAVAILABLE prerequisites_missing\n'
+fi
+
 printf '\n=== End of snapshot ===\n'
