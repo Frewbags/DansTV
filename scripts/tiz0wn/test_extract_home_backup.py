@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 import base64
+from contextlib import closing
 import hashlib
 import importlib.util
 from pathlib import Path
@@ -23,7 +24,7 @@ class HomeBackupTests(unittest.TestCase):
         self.root = tempfile.TemporaryDirectory()
         self.addCleanup(self.root.cleanup)
         self.db = Path(self.root.name) / "stock.db"
-        with sqlite3.connect(self.db) as conn:
+        with closing(sqlite3.connect(self.db)) as conn:
             conn.execute(
                 "CREATE TABLE key_filter("
                 "appid TEXT, key TEXT, request TEXT, target_selector TEXT, args TEXT)"
