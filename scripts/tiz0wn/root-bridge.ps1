@@ -289,16 +289,7 @@ if ($session.host -ne $owner.pc -or $session.tv -ne $owner.tv -or $session.token
 try {
     $argsForReceiver = @('--host', [string]$session.host, '--tv', [string]$session.tv, '--token', [string]$session.token, '--output', [string]$session.output)
     if ($Action -eq 'ListenStaged') {
-        if ($session.survey_sha256 -notmatch '^[0-9a-f]{64}
-    & py -3 (Join-Path $PSScriptRoot 'root-bridge.py') @argsForReceiver
-    if ($LASTEXITCODE -ne 0) { throw 'No validated snapshot received.' }
-    & py -3 (Join-Path $PSScriptRoot 'assess-snapshot.py') --report $session.output
-    if ($LASTEXITCODE -ne 0) { throw 'Snapshot saved but assessment did not pass.' }
-} finally {
-    # Listener is synchronous and has exited. Credentials remain recoverable on failure.
-    & $PSCommandPath -Action Restore
-}
-) {
+        if ($session.survey_sha256 -notmatch '^[0-9a-f]{64}$') {
             throw 'Staged survey SHA-256 missing; restore credentials without running TV trial.'
         }
         $argsForReceiver += @('--staged', '--staged-hash', [string]$session.survey_sha256)
