@@ -77,4 +77,61 @@ if command -v sqlite3 >/dev/null 2>&1 && [ -r /opt/dbspace/.app-context.db ]; th
 else
     echo 'No readable app-context database'
 fi
+# Candidate inventory only: never stop, mask, restart or disable any unit.
+# The service names below were observed on this specific Q80T/firmware.
+printf '\n=== Telemetry candidate unit inventory (read-only) ===\n'
+if command -v systemctl >/dev/null 2>&1; then
+    for unit in \
+        acr.service \
+        adagent-service.service \
+        canalysis-service.service \
+        contents-recognition-service.service \
+        media-analytics-service.service \
+        vision-data-recognition-service.service \
+        kpi-logging.service \
+        issue_report_agent.service
+    do
+        printf '\nUNIT %s\n' "$unit"
+        # State, resolved unit path and direct dependency edges; no service
+        # contents, Environment, ExecStart or private command arguments.
+        systemctl show "$unit" --no-pager \
+            -p Id -p LoadState -p ActiveState -p SubState \
+            -p UnitFileState -p MainPID -p FragmentPath \
+            -p Requires -p Wants -p RequiredBy -p WantedBy \
+            -p PartOf -p BindsTo -p Conflicts \
+            2>/dev/null | head -17 || :
+    done
+else
+    printf 'systemctl unavailable; no service dependency inference\n'
+fi
+
+# Socket observation is optional and deliberately excludes every endpoint,
+# hostname, IP address and port. A single socket snapshot is NOT proof of
+# upstream telemetry or absence of traffic. Child PIDs may be missed.
+printf '\n=== Candidate network socket counts (read-only, no endpoints) ===\n'
+if command -v ss >/dev/null 2>&1 && command -v systemctl >/dev/null 2>&1; then
+    # One system snapshot, not eight changing separate observations.
+    socket_rows=$(ss -H -tunap 2>/dev/null) || socket_rows=''
+    for unit in \
+        acr.service adagent-service.service canalysis-service.service \
+        contents-recognition-service.service media-analytics-service.service \
+        vision-data-recognition-service.service kpi-logging.service \
+        issue_report_agent.service
+    do
+        pid=$(systemctl show "$unit" -p MainPID 2>/dev/null | sed -n 's/^MainPID=//p' | head -1)
+        case "$pid" in
+            ''|0|*[!0-9]*) printf '%s: main_pid_unavailable\n' "$unit";;
+            *)
+                count=$(printf '%s\n' "$socket_rows" | awk -v pid="$pid" '
+                    index($0, "pid=" pid ",") || index($0, "pid=" pid ")") { n++ }
+                    END { print n+0 }
+                ')
+                printf '%s: main_pid_socket_rows=%s (single snapshot; children not covered)\n' "$unit" "$count"
+                ;;
+        esac
+    done
+else
+    printf 'ss or systemctl unavailable; network observation not measured\n'
+fi
+
 printf '\n=== End of snapshot ===\n'
