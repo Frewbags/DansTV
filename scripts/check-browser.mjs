@@ -4,7 +4,7 @@ import { mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { openPreview, root } from './browser.mjs';
 
 const KEY = 'cleanframe.home.v1';
-const PRIMARY = ['stremio', 'netflix', 'disneyplus', 'youtube', 'appletv', 'primevideo', 'abciview', 'sbs', 'applemusic'];
+const PRIMARY = ['livetv', 'netflix', 'primevideo', 'youtube', 'jellyfin', 'kayo', 'abciview', 'sbs', '7plus', '9now', '10play', 'appletv', 'applemusic', 'switch', 'switch2', 'ps4'];
 const IDS = ['IkWsFHtOY9.Stremio', 'org.tizen.netflix-app', 'MCmYXNxgcu.DisneyPlus', '9Ur5IzDKqV.TizenYouTube', 'com.samsung.tv.aria-video', 'org.tizen.primevideo', 'mWK87Xghap.ABCiview', 'OyE7OuxlUi.SBSOnDemand', 'org.tizen.apple.apple-music'];
 const NAMES = ['Stremio', 'Netflix', 'Disney+', 'YouTube', 'Apple TV', 'Prime Video', 'ABC iview', 'SBS On Demand', 'Apple Music'];
 const EXTRA = 'AbCdEf1234.FamilyApp', SPOTIFY = 'rJeHak5zRg.Spotify';
@@ -149,7 +149,7 @@ async function group(name) {
 }
 const settingsSnapshot = () => current.evaluate(() => {
   const s = ShoreQA.state();
-  const rendered = [...document.getElementById('stage').classList].filter(c => /^(bg|l|a|u|f|m|font)-/.test(c)).sort();
+  const rendered = [...document.getElementById('stage').classList].filter(c => /^(bg|l|a|u|f|m|ac|font)-/.test(c)).sort();
   return { stored: localStorage.getItem('cleanframe.home.v1'), committed: s.committed, shown: s.shown, rendered, writes: s.writes, storageAttempts: window.__storageAttempts };
 });
 const choice = (axis, value) => act('choice.' + axis + '.' + value);
@@ -250,7 +250,7 @@ try {
     await closePage();
     await page({ seed: { dock: [], wallpaper: 'missing', mode: 'constructor', theme: 'constructor' } });
     const s = await state();
-    check('Invalid values recover usable bounded Home', s.dock.length >= 1 && s.dock.length <= 9 && walls.some(w => w.id === s.wallpaper) && ['fixed', 'open', '5', '15', '60'].includes(s.mode), s);
+    check('Invalid values recover usable bounded Home', s.dock.length >= 1 && s.dock.length <= 16 && walls.some(w => w.id === s.wallpaper) && ['fixed', 'open', '5', '15', '60'].includes(s.mode), s);
     await closePage();
     await page({ seed: baseline({ dock: [EXTRA, 'netflix'], lastApp: EXTRA }), catalogFailure: true });
     await library();
@@ -303,7 +303,19 @@ try {
     await current.waitForFunction(() => window.ShoreQA && !ShoreQA.state().pending && !ShoreQA.ready());
     const before = await stored();
     failImages = false;
-    await current.evaluate(() => window.__setHidden(false)); await ready();
+    await current.evaluate(() => window.__setHidden(false));
+    try {
+      await ready();
+    } catch (error) {
+      const diagnostics = await current.evaluate(() => ({
+        hidden: document.hidden, state: ShoreQA.state(),
+        images: ['photo', 'matImg', 'phFieldImg', 'utFieldImg'].map(id => {
+          const img = document.getElementById(id);
+          return { id, source: img.currentSrc || img.src, complete: img.complete, naturalWidth: img.naturalWidth };
+        })
+      }));
+      throw Error('Visible wallpaper retry did not settle: ' + JSON.stringify(diagnostics));
+    }
     check('Visible retry restores a complete wallpaper without a preference write', same(await stored(), before) && await current.evaluate(() => document.getElementById('photo').naturalWidth > 0));
   });
   await run('Visibility return preserves an unapplied wallpaper preview', async () => {
@@ -402,7 +414,7 @@ try {
         const scale = document.getElementById('stage').getBoundingClientRect().width / 1920;
         return elements.map(e => (e.querySelector('.ico').getBoundingClientRect().left - e.querySelector('.settings-group-copy').getBoundingClientRect().right) / scale);
       });
-      check('Settings group arrows stay separate from their copy at ' + width, groups.length === 6 && groups.every(gap => gap >= 31.5), groups);
+      check('Settings group arrows stay separate from their copy at ' + width, groups.length === 7 && groups.every(gap => gap >= 31.5), groups);
       await wallpaper();
       const caption = await current.locator('.wallpaper-preview-name').evaluate(e => {
         const scale = document.getElementById('stage').getBoundingClientRect().width / 1920;
@@ -452,6 +464,90 @@ try {
     await group('samsung'); await act('samsung.inputs');
     await current.waitForSelector('[data-action="inputs.retry"]');
     check('Empty inventory is truthful', (await current.locator('#stage').innerText()).includes('No HDMI inputs were reported'));
+  });
+  await run('Six visible dock apps with locally bundled brand icons', async () => {
+    await page();
+    for (const display of ['both', 'icons', 'text']) {
+      await look({ layout: 'dock', apps: display });
+      await current.waitForTimeout(240);
+      const layout = await current.evaluate(() => {
+        const shelf = document.getElementById('shelf').getBoundingClientRect();
+        const tiles = Array.from(document.querySelectorAll('#track .tile.k-app')).map(e => {
+          const r = e.getBoundingClientRect();
+          return { left: r.left, right: r.right };
+        });
+        return {
+          screenLeft: shelf.left, screenRight: shelf.right, shelfWidth: shelf.width,
+          fullyVisible: tiles.filter(r => r.left >= shelf.left - 0.5 && r.right <= shelf.right + 0.5).length,
+          fifth: tiles[4], sixth: tiles[5], seventh: tiles[6]
+        };
+      });
+      check(display + ': exactly six complete dock tiles', layout.fullyVisible === 6
+        && layout.sixth.right <= layout.screenRight + 0.5
+        && layout.seventh.right > layout.screenRight + 0.5, layout);
+    }
+    await look({ apps: 'both' });
+    for (const icon of ['livetv', 'netflix', 'primevideo', 'youtube', 'jellyfin', 'kayo', 'abciview', 'sbs', '7plus', '9now', '10play', 'appletv', 'applemusic', 'switch', 'switch2', 'ps4']) {
+      const response = await current.request.get(preview.baseURL + '/home/assets/icons/' + icon + '.svg');
+      check(icon + ' brand icon is locally bundled', response.ok() && (await response.text()).includes('<svg'));
+    }
+    const marks = await current.evaluate(() => Array.from(document.querySelectorAll('#track [data-mark]'), e => e.getAttribute('data-mark')));
+    check('Home tiles render brand marks rather than monograms', ['livetv', 'jellyfin', 'kayo', '7plus', '9now', '10play'].every(id => marks.includes(id)), marks);
+    await nav(...Array(6).fill('right'));
+    await current.waitForTimeout(240);
+    const moved = await current.evaluate(() => {
+      const shelf = document.getElementById('shelf').getBoundingClientRect();
+      const tiles = Array.from(document.querySelectorAll('#track .tile.k-app'));
+      return { visible: tiles.filter(e => { const r = e.getBoundingClientRect(); return r.left >= shelf.left - 0.5 && r.right <= shelf.right + 0.5; }).length,
+        focus: document.querySelector('#track .tile.is-focus')?.getAttribute('data-action') };
+    });
+    check('Remote right scrolls one complete tile at a time', moved.visible === 6 && moved.focus === 'home.app.sbs', moved);
+  });
+
+  await run('Console shortcuts use editable saved HDMI ports', async () => {
+    await page();
+    const initial = await state();
+    check('Three named console shortcuts are present but unassigned', ['switch', 'switch2', 'ps4'].every(id =>
+      initial.dock.includes(id) && initial.consolePorts[id] === null));
+    await act('home.app.switch'); await current.waitForFunction(() => ShoreQA.where().view === 'message');
+    check('Unassigned console does not switch inputs', (await current.evaluate(() => __tv.calls.length)) === 0
+      && /assign/i.test(await current.locator('#stage').innerText()));
+    await nav('back');
+    await group('consoles');
+    await act('console.select.switch');
+    check('Switch mapping opens five available input choices', (await current.locator('[data-action^="console.map.switch."]').count()) === 5);
+    await act('console.map.switch.2');
+    const mapped = await stored();
+    check('Explicit port 2 assignment persists locally', mapped.consolePorts.switch === 2);
+    await nav('back'); await nav('back'); await scene('home');
+    await act('home.app.switch');
+    await current.waitForFunction(() => __tv.calls.some(c => c.method === 'setSource'));
+    const selected = await current.evaluate(() => __tv.calls.find(c => c.method === 'setSource'));
+    check('Switch activates only the assigned HDMI input', selected.number === 2, selected);
+    await current.reload(); await ready();
+    check('Saved mapping survives reload', (await state()).consolePorts.switch === 2);
+    await group('consoles'); await act('console.select.switch'); await act('console.map.switch.0');
+    check('Unassigning a shortcut is saved', (await stored()).consolePorts.switch === null);
+    await closePage();
+    await page({ seed: baseline({ consolePorts: { switch: '2', switch2: -2, ps4: 99 } }) });
+    const sanitized = await state();
+    check('Malformed HDMI assignments are rejected', ['switch', 'switch2', 'ps4'].every(id =>
+      sanitized.consolePorts[id] === null), sanitized.consolePorts);
+  });
+  await run('TV-provided icons take precedence over bundled brand fallback', async () => {
+    await page({ catalog: CATALOG.map(a => a.id === 'org.tizen.netflix-app'
+      ? { ...a, iconPath: '/home/assets/icons/netflix.svg' } : a) });
+    await library();
+    await scene('home');
+    await current.waitForFunction(() => {
+      const icon = document.querySelector('[data-action="home.app.netflix"] img[data-native-icon]');
+      return icon && icon.complete && icon.naturalWidth > 0;
+    });
+    check('Installed icon is displayed when Tizen supplies it',
+      await current.evaluate(() => {
+        const el = document.querySelector('[data-action="home.app.netflix"] .native-icon');
+        return !!(el && el.classList.contains('has-native-icon'));
+      }));
   });
   await run('Real catalogue and native launch boundary', async () => {
     await page(); await library();
@@ -537,9 +633,11 @@ try {
     await act('editor.move.netflix'); await nav('down', 'ok');
     const moved = start.slice(); [moved[1], moved[2]] = [moved[2], moved[1]];
     check('Placed move persists immediately', same((await stored()).dock, moved));
-    await act('editor.add.' + EXTRA); check('Nine-app cap prevents addition', (await state()).dock.length === 9 && !(await state()).dock.includes(EXTRA));
-    await remove('stremio'); await act('editor.add.' + EXTRA);
-    check('Native app can be pinned with stable ID', (await stored()).dock.includes(EXTRA) && (await state()).dock.length === 9);
+    await remove('switch'); await act('editor.add.' + EXTRA);
+    check('Console can be replaced by a native installed app', (await state()).dock.length === 16 && (await state()).dock.includes(EXTRA));
+    await act('editor.add.' + SPOTIFY); check('Sixteen-app cap prevents overflow', (await state()).dock.length === 16 && !(await state()).dock.includes(SPOTIFY));
+    await remove('livetv'); await act('editor.add.livetv');
+    check('Native app can be pinned with stable ID', (await stored()).dock.includes(EXTRA) && (await state()).dock.length === 16);
     check('Native pin retains readable metadata for failed discovery', (await stored()).appRecords.some(a => a.id === EXTRA && a.name === UNSAFE_NAME));
     await current.reload(); await ready(); check('Native pin survives reload', (await state()).dock.includes(EXTRA));
     await editor(); const ids = (await state()).dock;
@@ -594,8 +692,8 @@ try {
   });
   await run('Settings overview and visible choices', async () => {
     await page(); await scene('settings');
-    const expected = ['settings.group.background', 'settings.group.layout', 'settings.group.typography', 'settings.group.focus', 'settings.editor', 'settings.group.samsung'];
-    check('Overview has all six settings groups', same((await call('actions')).filter(a => expected.includes(a)).sort(), expected.slice().sort()));
+    const expected = ['settings.group.background', 'settings.group.layout', 'settings.group.typography', 'settings.group.focus', 'settings.editor', 'settings.group.consoles', 'settings.group.samsung'];
+    check('Overview has all seven settings groups', same((await call('actions')).filter(a => expected.includes(a)).sort(), expected.slice().sort()));
     const specs = {
       background: { bg: ['dark', 'light', 'photo'] },
       layout: { layout: ['list', 'dock'], apps: ['icons', 'both', 'text'], controls: ['icons', 'both', 'text'] },
@@ -672,7 +770,8 @@ try {
       ['layout', 'controls', ['text', 'both', 'icons']],
       ['typography', 'font', (await state()).fonts.available],
       ['focus', 'focus', ['type', 'glass']],
-      ['focus', 'material', ['frost', 'tint', 'soft']]
+      ['focus', 'material', ['frost', 'tint', 'soft']],
+      ['focus', 'accent', ['blue', 'violet', 'emerald', 'neutral']]
     ];
     for (const [name, axis, values] of specs) {
       await group(name);
@@ -683,7 +782,7 @@ try {
         const after = await settingsSnapshot(), rows = await radios();
         const expectedWrites = before.writes + (before.committed[axis] === value ? 0 : 1);
         const untouched = { ...after.committed, [axis]: before.committed[axis] };
-        const prefix = { bg: 'bg', layout: 'l', apps: 'a', controls: 'u', focus: 'f', material: 'm', font: 'font' }[axis];
+        const prefix = { bg: 'bg', layout: 'l', apps: 'a', controls: 'u', focus: 'f', material: 'm', accent: 'ac', font: 'font' }[axis];
         const shown = !Object.hasOwn(after.shown, axis) || after.shown[axis] === value;
         check(axis + ' OK applies ' + value + ' once', after.committed[axis] === value && shown && after.rendered.includes(prefix + '-' + value) && same(untouched, before.committed) && expectedWrites === after.writes && after.storageAttempts - before.storageAttempts === expectedWrites - before.writes && rows.some(r => r.action === 'choice.' + axis + '.' + value && r.checked === 'true'), { before, after, rows });
       }
@@ -1041,7 +1140,7 @@ try {
   await run('Physical-key repeats and Back hierarchy', async () => {
     await page(); await editor(); await remove('netflix');
     await current.keyboard.down('Enter'); await current.keyboard.down('Enter');
-    check('Held OK restores once without removing again', (await state()).dock.includes('netflix') && (await state()).dock.length === 9);
+    check('Held OK restores once without removing again', (await state()).dock.includes('netflix') && (await state()).dock.length === 16);
     await current.keyboard.up('Enter');
     await current.keyboard.down('Escape'); await current.keyboard.down('Escape');
     check('Held Back closes one layer only', (await call('where')).view === 'settings' && (await state()).focusAction === 'settings.editor');
@@ -1095,4 +1194,5 @@ finally {
   writeFileSync(out + 'checks.json', JSON.stringify(report, null, 2) + '\n');
 }
 console.log(report.checks.filter(c => c.passed).length + ' checks passed; ' + report.failures.length + ' failure(s). Report: .local/qa/checks.json');
+if (!report.checks.length && report.failures.length) console.error('Browser startup error: ' + (report.failures[0].error || report.failures[0].name || JSON.stringify(report.failures[0])).split('\n').slice(0, 4).join('\n'));
 if (report.failures.length) process.exitCode = 1;

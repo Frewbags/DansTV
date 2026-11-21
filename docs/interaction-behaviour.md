@@ -21,6 +21,7 @@ Settings opens a grouped overview: Background, Layout, Typography, Focus, Apps o
 | Typography | Manrope, Neue Montreal, Mori, Pangram Sans, Geist and Newsreader, when available |
 | Focus | Type or Glass; Soft, Frost or Clear tint material |
 | Apps on Home | Membership and arrangement editor |
+| Samsung sound | TV volume up/down and mute where the public TVAudioControl API is available; otherwise controls remain disabled |
 | Samsung | Samsung Home, TV settings and Inputs |
 
 Up/Down moves between rows. Left/Right moves between choices in a horizontal row. Focus alone changes neither the preview nor saved preferences in these appearance groups. Wallpaper has its own temporary photo preview, described below. OK applies the focused value. A checkmark identifies the applied value; the filled plate identifies remote focus. Applying the current value does not write again.
@@ -30,6 +31,8 @@ Material applies to a photographic Dock, or Glass focus on a photographic List. 
 A font or photo change applies only after its resources are ready and storage succeeds. A load or storage failure keeps the previous appearance and checkmark, with a Try again action. Back cancels a pending change, leaves the group and keeps completed changes. Late load callbacks cannot apply a cancelled choice. There is no Save button. Returning to a group restores its last choice focus; returning to Settings restores its category focus. Rotation is nested within Background, and Back returns to its Rotation row.
 
 The selected font applies to Home app names, the clock and Home controls, including Newsreader. Settings, All apps, the Home editor and status text retain Manrope. The preview shows the committed Home appearance and its clock continues to update. Pangram faces are available in Nathan's private build when the local files are present; their binaries are not included in the public source. An unavailable optional face is omitted. If the baseline font is slow or missing, Home remains usable with a local fallback and can recover when the font loads.
+
+Samsung → Sound uses the public `tizen.tvaudiocontrol` API, reading back volume and mute state after each explicit OK press. It does not continuously poll and cannot assume external ARC/eARC devices or every TV firmware support these commands. If the API is missing or rejects a call, controls stay unavailable with a local explanation; the existing TV settings route remains accessible. This is an optional device feature, not native system-settings replacement. Hardware verification on the Q80T is pending.
 
 ## Streaming apps
 

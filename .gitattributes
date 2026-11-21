@@ -1,0 +1,3 @@
+# Keep Linux shell entrypoints runnable when cloned from Windows.
+/scripts/tiz0wn/lab/*.sh text eol=lf
+/scripts/tiz0wn/*.sh text eol=lf

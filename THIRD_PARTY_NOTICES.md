@@ -18,6 +18,11 @@ The public app uses Manrope, Geist and Newsreader. A personal widget containing 
 | --- | --- |
 | Simple Icons service marks | CC0; exact revisions and adaptations in `app/assets/icons/SOURCES.json` and `ADDITIONAL-SOURCES.json`. The CC0 text is retained beside the icons. |
 | Disney+, ABC and SBS marks | [Custom Brand Icons](https://github.com/elax46/custom-brand-icons), MIT. The retained licence is `app/assets/icons/CUSTOM-BRAND-ICONS-LICENSE.txt`. ABC and SBS sources were replaced during the public-source review. Exact revisions, source files and extraction/recolour notes are in `SOURCES.json`. |
+| Jellyfin mark | [Simple Icons](https://github.com/simple-icons/simple-icons/blob/develop/icons/jellyfin.svg), CC0. The Jellyfin project retains name/logo restrictions. |
+| Kayo, 7plus, 9Now and historical 10 Play marks | [Custom Brand Icons](https://github.com/elax46/custom-brand-icons) at the exact revisions in `app/assets/icons/ADDITIONAL-SOURCES.json`. **CC BY-NC-SA 4.0**, not MIT; white recolouring and adjusted viewBoxes are adaptations, also CC BY-NC-SA 4.0. Full licence in `app/assets/icons/CUSTOM-BRAND-ICONS-CC-BY-NC-SA-4.0.txt`. Attribution: custom-brand-icons contributors. Non-commercial and share-alike restrictions apply; do not redistribute these as MIT assets. |
+| Nintendo Switch and Nintendo Switch 2 marks | [Sentry Platformicons](https://github.com/getsentry/platformicons) SVGs; upstream package declares OFL-1.1. We retain the device glyphs and the Switch 2 numeral, recoloured white. Existing SIL OFL 1.1 text: `app/assets/manrope-OFL.txt`. Nintendo retains trademark rights. |
+| PlayStation 4 mark | [Simple Icons](https://github.com/simple-icons/simple-icons/blob/develop/icons/playstation4.svg), CC0; cropped monochrome mark. Sony retains trademark rights. |
+| Live TV outline | Original DansTV generic tuner/TV pictogram; not a Samsung logo. |
 | Art, apps, settings and home outlines | Original CleanFrame drawings, covered by the project's MIT licence. |
 
 Brand marks identify services. Their owners retain trademark rights; this project claims no endorsement or affiliation. The older Australian TV icon archive's GPL text is retained for historical provenance only; no current icon uses that archive.
@@ -33,3 +38,11 @@ Photographers retain their rights. Wallpapers, thumbnails, panel backgrounds and
 Development dependencies retain the licences in their npm packages. They are not copied into the TV JavaScript runtime.
 
 `npm run export:public` excludes private fonts and includes this notice and the root MIT licence. Preserve the included font and icon licence texts. Review [public release preparation](docs/public-release.md) before publishing a repository or download.
+
+## Optional Q80T Tizen 5.5 integration tooling
+
+| Material | Provenance and terms |
+| --- | --- |
+| `scripts/tiz0wn/home-ctx.sh`, research workflow and stage documentation | Adapted from [sebastianspicker/tiz0wn](https://github.com/sebastianspicker/tiz0wn), Copyright © 2026 Sebastian J. Spicker. MIT License; retained in [`scripts/tiz0wn/LICENSE`](scripts/tiz0wn/LICENSE). The CPU/RAM snapshot and Windows preflight are new companion tooling. Upstream works only on verified firmware; no Samsung firmware, root payload or root executable is bundled. |
+
+The optional tools are not included in the TV widget or public installer and make no system changes unless independently staged and invoked on the device. The upstream source license does not cover proprietary Samsung firmware.

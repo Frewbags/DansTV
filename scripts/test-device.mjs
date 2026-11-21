@@ -5,7 +5,7 @@ import vm from 'node:vm';
 import test from 'node:test';
 
 const source = readFileSync(new URL('../app/device.js', import.meta.url), 'utf8');
-function harness({ supported = true, throwSource = false } = {}) {
+function harness({ supported = true, throwSource = false, audioSupported = false, audioThrow = false } = {}) {
   let now = 0, next = 0;
   const timers = new Map(), requests = [], launches = [], sourceRequests = [], changes = [];
   let current = { type: 'HDMI', number: 2 };
@@ -15,6 +15,17 @@ function harness({ supported = true, throwSource = false } = {}) {
     launch: (id, ok, fail) => launches.push({ id, ok, fail })
   };
   const window = { tizen: { application } };
+  const audio = { volume: 25, muted: false, calls: [] };
+  if (audioSupported) {
+    function checkAudio() { if (audioThrow) throw Error('Audio feature rejected'); }
+    window.tizen.tvaudiocontrol = {
+      getVolume: () => { checkAudio(); return audio.volume; },
+      isMute: () => { checkAudio(); return audio.muted; },
+      setVolumeUp: () => { checkAudio(); audio.calls.push('up'); audio.volume = Math.min(100, audio.volume + 1); },
+      setVolumeDown: () => { checkAudio(); audio.calls.push('down'); audio.volume = Math.max(0, audio.volume - 1); },
+      setMute: state => { checkAudio(); audio.calls.push('mute:' + state); audio.muted = !!state; }
+    };
+  }
   if (supported) {
     window.tizen.systeminfo = { getPropertyValue: (name, ok, fail) => { assert.equal(name, 'VIDEOSOURCE'); sourceRequests.push({ ok, fail }); } };
     window.tizen.tvwindow = { getSource: (...args) => { assert.equal(args.length, 0); return current; },
@@ -29,7 +40,7 @@ function harness({ supported = true, throwSource = false } = {}) {
     now += ms;
     for (const [id, timer] of timers) if (timer.at <= now) { timers.delete(id); timer.callback(); }
   }
-  return { device: window.FrameDevice, requests, launches, sourceRequests, changes, advance, setCurrent: value => { current = value; } };
+  return { device: window.FrameDevice, requests, launches, sourceRequests, changes, audio, advance, setCurrent: value => { current = value; } };
 }
 
 test('a 500-app catalogue can arrive after the old eight-second deadline', () => {
@@ -160,4 +171,119 @@ test('unknown and invalid ports cannot be substituted and a newer request cancel
   assert.equal(results[0].cancelled, true);
   h.sourceRequests[0].ok(video); assert.equal(h.changes.length, 0);
   h.sourceRequests[1].ok(video); assert.equal(h.changes[0].source.number, 2);
+});
+
+
+test('Q80T launcher handles navigation but does not steal system remote buttons', () => {
+  const main = readFileSync(new URL('../app/main.js', import.meta.url), 'utf8');
+  const expression = main.match(/\bvar KEYS\s*=\s*\{([^}]+)\}/);
+  assert.ok(expression, 'Remote key mapping must remain explicit');
+  const keys = new Map([...expression[1].matchAll(/(\d+)\s*:\s*'([^']+)'/g)]
+    .map(([, code, action]) => [Number(code), action]));
+  for (const [code, action] of [[37, 'left'], [38, 'up'], [39, 'right'], [40, 'down'], [13, 'ok'], [10009, 'back']]) {
+    assert.equal(keys.get(code), action, 'Missing expected navigation mapping for ' + code);
+  }
+  // These are not media controls provided by the launcher. Let the TV/streaming
+  // application retain their native function, including long-press behavior.
+  const reserved = [
+    447, 448, 449, 427, 428, 10073, 10190, 10252, 415, 19,
+    403, 404, 405, 406, 458, 10072
+  ];
+  for (const code of reserved) assert.equal(keys.has(code), false, 'Unexpected capture of system button ' + code);
+  assert.doesNotMatch(main + source, /\btvinputdevice\s*\.\s*registerKey(?:Batch)?\s*\(/i,
+    'Registering extra remote keys can disable their default Samsung actions');
+  assert.doesNotMatch(main + source, /addEventListener\s*\(\s*['"]tizenhwkey['"]/i,
+    'TV web apps must use documented keyboard input, not mobile hardware key events');
+});
+
+test('Q80T Live TV shortcut opens Samsung viewer without a channel guess', () => {
+  const h = harness(), outcomes = [];
+  h.device.liveTV(error => outcomes.push(error));
+  assert.equal(h.launches.length, 1);
+  assert.equal(h.launches[0].id, 'org.tizen.tv-viewer');
+  h.launches[0].ok();
+  assert.deepEqual(outcomes, [null]);
+});
+
+test('named Australian apps resolve installed application IDs before launching', () => {
+  for (const [brand, record] of [
+    ['jellyfin', { id: 'AbCdEf1234.Jellyfin', name: 'Jellyfin', show: true }],
+    ['kayo', { id: 'eYuOiOLYQX.KayoSports', name: 'Kayo', show: true }],
+    ['7plus', { id: 'icp4AvUPiA.7plus', name: '7plus', show: true }],
+    ['9now', { id: 'Ne2ZsPWdKl.9NOW', name: '9Now', show: true }],
+    ['10play', { id: 'KaLitts8bq.tenplaySamsungTizen', name: '10', show: true }]
+  ]) {
+    const h = harness(), result = [];
+    h.device.launchNamed(brand, error => result.push(error));
+    assert.equal(h.launches.length, 0);
+    h.requests[0].ok([record]);
+    assert.equal(h.launches.length, 1);
+    assert.equal(h.launches[0].id, record.id);
+    h.launches[0].ok();
+    assert.deepEqual(result, [null]);
+  }
+});
+
+test('missing and ambiguous named apps fail rather than launching a wrong ID', () => {
+  const missing = harness(); let missingError;
+  missing.device.launchNamed('jellyfin', error => { missingError = error; });
+  missing.requests[0].ok([]);
+  assert.match(missingError.message, /not installed|cannot be discovered/i);
+  assert.equal(missing.launches.length, 0);
+
+  const ambiguous = harness(); let ambiguousError;
+  ambiguous.device.launchNamed('jellyfin', error => { ambiguousError = error; });
+  ambiguous.requests[0].ok([
+    { id: 'AbCdEf1234.Jellyfin', name: 'Jellyfin', show: true },
+    { id: 'AbCdEf1235.Jellyfin', name: 'Jellyfin', show: true }
+  ]);
+  assert.match(ambiguousError.message, /Multiple matching/);
+  assert.equal(ambiguous.launches.length, 0);
+});
+
+test('user-mapped console can switch source without a discovery result', () => {
+  const h = harness(), results = [];
+  h.device.setSource(3, (error, input) => results.push({ error, input }), true);
+  h.sourceRequests[0].fail({ name: 'SecurityError' });
+  assert.equal(h.changes.length, 1);
+  assert.equal(h.changes[0].source.type, 'HDMI');
+  assert.equal(h.changes[0].source.number, 3);
+  h.changes[0].ok({ type: 'HDMI', number: 3 });
+  assert.equal(h.launches.length, 1);
+  assert.equal(h.launches[0].id, 'org.tizen.tv-viewer');
+  h.launches[0].ok();
+  assert.equal(results[0].error, null);
+  assert.equal(results[0].input.number, 3);
+});
+
+test('unmapped source requests never silently choose an HDMI port', () => {
+  const h = harness(), result = [];
+  h.device.setSource(3, error => result.push(error));
+  h.sourceRequests[0].fail({ name: 'SecurityError' });
+  assert.equal(h.changes.length, 0);
+  assert.equal(h.launches.length, 0);
+  assert.equal(result.length, 1);
+  assert.ok(result[0]);
+});
+
+test('TVAudioControl is optional and does not impersonate a working TV', () => {
+  const missing = harness();
+  assert.equal(missing.device.audioStatus().available, false);
+  assert.equal(missing.device.audioAdjust('up').available, false);
+  const rejected = harness({ audioSupported: true, audioThrow: true });
+  assert.equal(rejected.device.audioStatus().available, false);
+  assert.equal(rejected.device.audioAdjust('mute').available, false);
+  assert.equal(rejected.audio.calls.length, 0);
+});
+
+test('TVAudioControl reads back volume and mute after each explicit adjustment', () => {
+  const h = harness({ audioSupported: true });
+  assert.equal(h.device.audioStatus().volume, 25);
+  assert.equal(h.device.audioAdjust('up').volume, 26);
+  assert.equal(h.device.audioAdjust('down').volume, 25);
+  assert.equal(h.device.audioAdjust('mute').muted, true);
+  assert.equal(h.device.audioAdjust('mute').muted, false);
+  assert.deepEqual(h.audio.calls, ['up', 'down', 'mute:true', 'mute:false']);
+  assert.equal(h.device.audioAdjust('unsupported').available, false);
+  assert.equal(h.audio.calls.length, 4);
 });
