@@ -24,8 +24,9 @@ def command_text(mode: str, host: str, token: str) -> bytes:
         raise ValueError('Invalid session token')
     survey = (ROOT / 'scripts/tiz0wn/snapshot.sh').read_text(encoding='utf-8')
     # Sourced in the already proven privileged Bash context; no executable label change.
-    return f'''rm -f /tmp/dtv{token[:6]}
-OUT=/tmp/.danstv-baseline-$$
+    return f'''umask 077
+rm -f /tmp/dtv{token[:6]}
+OUT=/tmp/.danstv-baseline-$
 (
   printf 'DANSTV-ROOT-CHANNEL mode=Snapshot\\n'
   printf 'DANSTV-EUID=%s\\n' "$(/usr/bin/id -u)"
