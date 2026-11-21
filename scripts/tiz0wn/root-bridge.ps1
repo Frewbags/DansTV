@@ -205,12 +205,14 @@ if ($Action -eq 'PrepareStaged') {
     if ($LASTEXITCODE -ne 0 -or $state -ne 'device') {
         throw 'Q80T SDB transport is not ready; no credentials changed.'
     }
-    foreach ($item in @(@($surveyLocal, $surveyRemote), @($stageLocal, $stageRemote))) {
+    foreach ($kind in @('survey', 'loader')) {
         # Use a fresh unique remote name; do not overwrite any TV system file.
-        $transfer = ((& $sdb -s $serial push $item[0] $item[1] 2>&1) | Out-String)
+        if ($kind -eq 'survey') { $source = $surveyLocal; $destination = $surveyRemote }
+        else { $source = $stageLocal; $destination = $stageRemote }
+        $transfer = ((& $sdb -s $serial push $source $destination 2>&1) | Out-String)
         if ($LASTEXITCODE -ne 0 -or $transfer -notmatch '1 file\(s\) pushed' -or
             $transfer -match '(?i)failed|permission denied') {
-            throw 'TV did not confirm SDB upload of both private files; credentials unchanged.'
+            throw 'TV did not confirm both staged SDB uploads; credentials unchanged.'
         }
     }
     # The staged survey remains inert unless the owner later enters the
