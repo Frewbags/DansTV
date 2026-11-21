@@ -1,120 +1,100 @@
 # DansTV Q80T completion gates
 
-Updated 20 November 2026. Target only: QA65Q80TAWXXY, Tizen 5.5,
-T-NKMUABC-2743.0. Owner branch: `feature/q80t-windows-setup`, draft PR #1.
+Updated **21 November 2026** after a successful read-only root snapshot.
+Target only: **QA65Q80TAWXXY**, Tizen 5.5, **T-NKMUABC-2743.0**.
+Owner branch: `feature/q80t-windows-setup`, draft PR #1.
 
-## Current evidence
+## Hardware evidence and current state
 
 | Item | Status |
 | --- | --- |
-| Standalone DansTV web widget | Previously installed/launched by owner |
-| Launcher/device simulation | **18/18 passed on owner's Windows PC (20 Nov)** |
-| Cleanup planner simulation | **9/9 passed on owner's Windows PC (20 Nov)** |
-| ESLint / widget static check | Passed on owner's Windows PC (20 Nov) |
-| Cross-platform `npm run check`, Windows CI, snapshot assessor | Added subsequently; rerun/CI evidence pending |
-| Volume / mute | Web API adapter has mock coverage; physical Q80T validation pending |
-| HDMI, applications, Back and Samsung Settings | Automated mock coverage; full current-build hardware regression pending |
-| Read-only root snapshot transport | Long-password method failed; **short SDB-staged method committed but not hardware-tested; no validated report received** |
-| Tizen 5.5 integration prerequisites | Read-only inventory and conservative assessor checks added; **no Q80T runtime or broker evidence yet** |
-| Vetro fork integration | Reviewed Curtisg890 `tizen55-tiz0wn-backend`; **reference design only**, not imported or installed |
-| Elevated access | One bounded UID-0 callback observed, not an enduring root shell |
-| Home-button replacement / cold boot | **Not achieved on this Q80T** |
-| Service cleanup / boot modification | **Not applied** |
+| Standalone DansTV WGT | Previously installed/launched by owner; latest physical regression pending |
+| UI/device simulations | 18/18 launcher/device tests on Windows (20 Nov); latest physical checks pending |
+| Home/static and cleanup guards | Passed on Windows 21 Nov; 9/9 cleanup tests |
+| Bounded snapshot transport simulations | Windows 15 cases passed (3 Linux-only skipped); **Linux 15/15 passed** |
+| Read-only report assessor | **7/7 passed**; hides raw private values |
+| Windows PowerShell parser | Passed following 21 Nov syntax fix; included in `check:home` |
+| Root diagnostic on Q80T | **SUCCESS, 21 Nov: TV checksum verified, complete framed snapshot received** |
+| XRDP/Windows credentials | Listener logged **access revoked and original lab credentials restored**; TV-saved password still to verify |
+| Home preferences and `XF86Home` | Report sections/indicators present; original values require **private review** |
+| Node PATH / dotnet / app-data / shell SMACK label | Observed in read-only snapshot; **service/runtime compatibility unproven** |
+| Native Home main-operation | **Not measured** |
+| Privileged service / authenticated broker | **Not provisioned or verified** |
+| Independently verified off-TV Home DB backup / recovery | **Not done** |
+| Home replacement and cold-boot persistence | **Not achieved** |
+| Debloat, Home writes, firmware/boot changes | **None applied** |
 
-## Offline architecture decision — 21 November
+The [verified milestone record](q80t-nov21-snapshot-success.md) preserves
+the observed sequence and privacy boundaries. The older
+[offline status](q80t-nov21-offline-status.md) is historical pre-success
+evidence, not the current instructions.
 
-Curtisg890's [Tizen 5.5 Vetro backend](https://github.com/Curtisg890/vetro/tree/tizen55-tiz0wn-backend) demonstrates an authenticated loopback root broker for a **different 2020 firmware**. It is not a root exploit, installed boot hook or Q80T launcher. Keep DansTV's static WGT and existing public Tizen controls; treat privileged services as a separately gated, optional backend.
+## Verified snapshot method (for later reuse, not the immediate next task)
 
-A future validated private snapshot will now report non-executing read-only indicators for Node on the shell PATH, the dotnet launcher, app-data directory and the survey shell SMACK label. They **do not** establish a TV web-service runtime or an authenticated broker. The assessor always reports those two as unmeasured and never authorises Home writes.
+The TV rejected `sdb pull` from its SDK staging path despite advertising
+`filesync_support:pushpull`. The working **checksum-gated** method
+does not attempt SDB pull. Instead, the host SDB-pushes a loader and a
+separate fixed survey. The owner connects Samsung Remote PC and opens
+Shared Folder **once**. The loader sends the survey's TV-observed SHA-256
+to the one-use LAN receiver, which only approves the expected digest.
+The survey posts a bounded, framed report. The wrapper then restores the
+disposable account and callback permissions.
 
-See [architecture review](q80t-vetro-tizen55-architecture.md) and [current hardware evidence](q80t-nov21-offline-status.md). Do not repeat the previously failed long-password trial by following the historical procedure without reviewing these blockers.
+The tested entrypoint is
+`scripts/tiz0wn/root-bridge.ps1 -Action PrepareStaged`, followed by
+`-Action ListenStaged` **before** the TV action; see the
+[operational README](../scripts/tiz0wn/README.md) for preflight,
+safe failure and restoration instructions. The older long-password
+`-Action Prepare` and the separate untested
+`staged-snapshot.ps1 -Action Prepare` are **not** replacements.
+One successful trial does not prove repeatability or establish
+cryptographic attestation.
 
-## Owner-side completion sequence
+## Resume work — no TV operation needed
 
-1. **Synchronise and test** from PowerShell, in
-   `C:\Users\Daniel\DansTV`:
+- [ ] Preserve raw report/receipt **only** in the owner's ignored
+      `.local/tiz0wn-lab/` directory; never commit, paste or publish
+      raw values, private addresses, token, password or unique device IDs.
+- [ ] Verify `root-bridge.ps1 -Action Doctor` after Restore if not yet
+      rerun, then ensure the TV's saved Remote PC password uses the
+      ordinary restored lab credential.
+- [ ] Privately inspect the actual five Home preference values and
+      `XF86Home` context. Distinguish successful query/value from
+      placeholder, missing row or error; don't infer mappings from
+      the safe assessor's `reported` wording.
+- [ ] Examine service/SMACK/runtime/partition evidence. Verify the
+      native Home main-operation handler separately; it was not measured.
+- [ ] Capture exact current Home DB/key-filter schema and typed originals.
+      Establish a **consistent off-TV copy with verified hash** and a
+      separately accessible restore/recovery route before any write.
+- [ ] Review the [Vetro architecture comparison](q80t-vetro-tizen55-architecture.md).
+      Keep signed web-service runtime and authenticated broker work
+      separate from the read-only snapshot success.
 
-   ```powershell
-   git pull --ff-only origin feature/q80t-windows-setup
-   npm run check
-   git status -sb
-   ```
+## Later gated acceptance sequence
 
-   Preserve `.serena/`, any private `.local/` files and pre-existing commits.
-   If Git refuses a fast-forward, stop and review instead of resetting.
-   `npm run check` is offline from the television.
+1. **Reversible Home trial**: only with model-specific native handler,
+   independently tested recovery, off-TV backups and exact-value
+   restore plan. Physical Home, Back, Live TV, HDMI, app returns,
+   standby/wake and Samsung Settings must be checked.
+2. **Cold boot / persistence**: test only after Home works safely;
+   never use Q60T/Q70T/Q90T offsets on this NKMUABC firmware.
+   A matching official image, original block backup and credible
+   hardware recovery remain mandatory for any firmware work.
+3. **Cleanup/debloat**: identify specific Q80T services/dependencies
+   and allow only reversible, bounded changes, preserving tuner, DRM,
+   connectivity, updates and app lifecycle.
+4. **Repeatability**: if later needed, a fresh read-only session
+   should independently reproduce checksum verification, snapshot
+   receipt, and restoration. Do not infer repeatability from one run.
 
-2. **Validate the running web widget** separately: installed app identity,
-   audio/mute, app launching, HDMI/console launch, Back, Samsung Settings,
-   standby/wake. Keep Samsung Home accessible. Do not treat unit tests as
-   physical-TV evidence.
+## Stop conditions
 
-3. **Run the read-only host Doctor** in Administrator PowerShell:
+**No Home/startup/firmware writes** if the original values are not
+known, native operation is unmeasured, off-TV copies cannot be
+verified, recovery is not independently available, model/firmware
+has changed, or an existing Home method could conflict.
 
-   ```powershell
-   .\scripts\tiz0wn\root-bridge.ps1 -Action Doctor
-   ```
-
-   Doctor checks the exact saved model/firmware and local disposable lab
-   prerequisites. It makes no TV change. Do not continue if a guard fails.
-
-4. **With the owner at the TV**, use the newer, explicitly experimental
-   **`PrepareStaged` / `ListenStaged`** procedure in
-   `scripts/tiz0wn/README.md`. `PrepareStaged` refuses to rotate the lab
-   account until SDB upload and readback SHA-256 verify, then validates XRDP's
-   TCP listener. `ListenStaged` accepts one report and automatically calls
-   Restore; Home and firmware stay untouched. If SDB pull is denied,
-   **stop**, with no credential change. If interrupted after preparing, use
-   `root-bridge.ps1 -Action Restore`, then Doctor. Confirm TV Remote PC
-   saved credentials return to the ordinary lab password. The older
-   `Prepare`/long-password sequence is not the current recommendation.
-
-5. **Keep raw reports private** under `.local/tiz0wn-lab/`. To produce a
-   shareable evidence summary without raw IDs/IPs, run:
-
-   ```powershell
-   $report = Get-ChildItem .local\tiz0wn-lab\snapshot-*.txt |
-     Sort-Object LastWriteTime -Descending | Select-Object -First 1
-   if ($report) {
-     py scripts\tiz0wn\assess-snapshot.py --report $report.FullName
-   }
-   ```
-
-   The assessor checks report framing and whether specific Home values
-   were captured. It is **not cryptographic authentication**, does not
-   retrieve the native main-operation handler, and cannot authorise a write.
-   Repeat a fresh read-only session before treating access as reliable.
-
-6. **Resolve Home method and recovery** only after reviewing the actual
-   Q80T evidence. Inspect `XF86Home` key-filter routing and the native
-   main-operation handler independently; neither the 2022 Tizen 6.5
-   Arn0 route nor the earlier Frame 2020 T-NKMDEUC implementation can be
-   imported on assumption. Capture typed original values and a consistent
-   `sqlite3 .backup` of any live Home database; transfer backups **off TV**,
-   record SHA-256 values, and establish a separately accessible recovery
-   route. The current bounded snapshot does not deliver this backup facility.
-   No Home assignment until these gates are fulfilled.
-
-7. **Perform one guarded, reversible Home trial**, only with a model-specific
-   apply and tested restore procedure. Verify physical Home, Back, Live TV,
-   HDMI and app return paths. Restore the saved baseline immediately after
-   the trial before considering permanent routing. A successful API return
-   alone does not prove correct physical Home handling.
-
-8. **Only after Home succeeds**, evaluate cold-boot behavior separately.
-   Defer persistent firmware/rootfs changes without an exact matching image,
-   original block backups and credible hardware recovery. Debloat only
-   individually measured, proven-safe Q80T services with reversible
-   original-state flags; do not copy Tizen 9 or Android disable lists.
-
-## Explicit stop conditions
-
-Stop without changing the TV if the saved device/firmware differs, snapshot
-is incomplete, original state is unknown, off-TV backups are absent, restore
-cannot be independently invoked, the native operation is unmeasured, or a
-second Home method is already active.
-
-**Acceptance target:** DansTV opens with the physical Home button after
-normal TV use, survives standby and cold boot, leaves the TV controls intact,
-and can be restored to Samsung Home without relying on an unverified root
-mechanism. This target is not yet demonstrated on the Q80T.
+**End goal (not yet achieved):** DansTV opens with the physical Home
+button, survives standby/cold boot, keeps the original Samsung
+essentials operational and can be restored independently.
