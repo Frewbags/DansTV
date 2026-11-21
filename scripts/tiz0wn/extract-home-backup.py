@@ -13,6 +13,7 @@ import binascii
 import hashlib
 import os
 from pathlib import Path
+from contextlib import closing
 import re
 import sqlite3
 import sys
@@ -63,7 +64,7 @@ def decode_backup(text: str) -> bytes:
 
 def verify_sqlite(path: Path) -> tuple[bool, bool]:
     # Read-only URI; never modify the off-TV backup, even during verification.
-    with sqlite3.connect(path.as_uri() + "?mode=ro&immutable=1", uri=True) as conn:
+    with closing(sqlite3.connect(path.as_uri() + "?mode=ro&immutable=1", uri=True)) as conn:
         result = conn.execute("PRAGMA quick_check;").fetchall()
         if result != [("ok",)]:
             raise BackupError("SQLite quick_check did not report ok")
