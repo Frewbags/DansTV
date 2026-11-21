@@ -40,6 +40,9 @@ class HomeBackupTests(unittest.TestCase):
             conn.execute(
                 "INSERT INTO managed_app VALUES ('com.samsung.tv.searchall','UI','test')"
             )
+            # closing() closes the connection but does not commit its transaction.
+            # Persist the fixture before the read-only verifier opens the DB.
+            conn.commit()
         self.data = self.db.read_bytes()
         self.report = self.mkreport(self.data)
 
@@ -81,10 +84,13 @@ class HomeBackupTests(unittest.TestCase):
             module.decode_backup(self.mkreport(b"this is not a database" * 200))
 
     def test_unexpected_home_row_fails(self):
-        with sqlite3.connect(self.db) as conn:
+        # sqlite3.Connection's context manager commits, but does not close.
+        # Keep both an explicit commit and close for Windows temp-file cleanup.
+        with closing(sqlite3.connect(self.db)) as conn:
             conn.execute(
                 "UPDATE key_filter SET target_selector='package:unexpected'"
             )
+            conn.commit()
         with self.assertRaises(module.BackupError):
             module.verify_sqlite(self.db)
 
