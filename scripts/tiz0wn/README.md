@@ -278,6 +278,22 @@ still require owner verification. The actual private Q80T report exists,
 but an off-TV Home DB backup and independent recovery route do not.
 Do not proceed to Home writes until those are verified.
 
+### Next read-only research: Q80T telemetry dependencies
+
+The 21 November full snapshot identified **running** ACR, ad-agent,
+content/vision/media-analytics, KPI logging and issue-reporting units.
+None has been established as safe to disable. The inventory also
+confirmed the built-in `org.tizen.tv-viewer`, which must be preserved.
+
+See the [evidence-based telemetry audit](../../docs/q80t-telemetry-audit.md).
+`snapshot.sh` now includes optional, bounded read-only unit
+dependency fields and candidate main-PID socket **counts only**.
+These additions are **not yet tested on Q80T hardware** and do not
+record endpoint addresses or establish that a service sends data to
+Samsung. The next task is offline review/testing followed by a separately
+authorised, fresh read-only collection if needed. No unit stop, mask,
+disable or package removal is allowed from this evidence alone.
+
 ### Remaining acceptance gates
 
 1. A repeatable, authenticated root command channel must return
