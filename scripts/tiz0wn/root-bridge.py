@@ -50,9 +50,11 @@ rm -f "$OUT"
 '''.encode('utf-8')
 
 
-def staged_command_text(host: str, token: str) -> bytes:
-    """Same fixed read-only survey; staged beforehand instead of downloaded as root."""
-    return command_text('Snapshot', host, token)
+def staged_command_text(host: str, token: str, remote: str) -> bytes:
+    """Fixed read-only survey staged with SDB; try to remove the staged file after use."""
+    if not re.fullmatch(r'/home/owner/share/tmp/sdk_tools/dtvs[0-9a-f]{8}\.sh', remote):
+        raise ValueError('Staged file path must use the dedicated sdk_tools prefix')
+    return command_text('Snapshot', host, token) + ('rm -f ' + remote + '\n').encode('ascii')
 
 
 def valid_report(body: bytes) -> bool:
@@ -153,6 +155,7 @@ def main() -> int:
     parser.add_argument('--timeout', type=int, default=300)
     parser.add_argument('--staged', action='store_true', help='Receive staged result, no executable GET')
     parser.add_argument('--write-stage', type=Path, help='Only render fixed survey to a private local file')
+    parser.add_argument('--stage-remote', help='Exact dedicated SDB staging path')
     args = parser.parse_args()
     host, tv = str(ipaddress.IPv4Address(args.host)), str(ipaddress.IPv4Address(args.tv))
     if not all(ipaddress.IPv4Address(value).is_private and not ipaddress.IPv4Address(value).is_loopback
@@ -165,7 +168,13 @@ def main() -> int:
         private_lab = (ROOT / '.local/tiz0wn-lab').resolve()
         if private_lab not in destination.parents or destination.exists():
             parser.error('Staged script must be a new file inside the private lab')
-        destination.write_bytes(staged_command_text(host, args.token))
+        if not args.stage_remote:
+            parser.error('--stage-remote required to render the staged survey')
+        try:
+            payload = staged_command_text(host, args.token, args.stage_remote)
+        except ValueError as exc:
+            parser.error(str(exc))
+        destination.write_bytes(payload)
         print('STAGE-RENDERED: fixed read-only survey prepared locally.', flush=True)
         return 0
     output = Path(args.output).resolve()
