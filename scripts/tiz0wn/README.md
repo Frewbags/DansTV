@@ -38,45 +38,46 @@ general-purpose root shell, privilege persistence, Home redirection, or
 any firmware modification. No raw partition write has been performed on
 this Q80T.
 
-The owner should run `uid-probe.ps1 -Action Restore` if its
-`Prepare` state is still active. That restores the dedicated temporary
-lab account passwords; it does not delete the lab, which remains
-available for controlled testing. Do not commit any credential files.
+The 16 November UID-only test is superseded by a **successful complete
+read-only snapshot on 21 November 2026**. The earlier longer,
+mixed-character Remote PC credential trial had failed; it remains a
+historical experiment, not the recommended method.
 
-A bounded **read-only snapshot transport** is implemented in
-`root-bridge.py` with `root-bridge.ps1` for Windows orchestration. Local
-HTTP and Linux Bash/curl round trips pass. The longer diagnostic
-was attempted on the TV in November 2026, but **no validated full snapshot
-was received**. The checked-in trigger remains unchanged, and long
-mixed-character credential handling is unresolved; do not blindly repeat
-the previous trial. It is not a general root shell. See the
-[21 November offline status](../../docs/q80t-nov21-offline-status.md)
-and current [handover](../../docs/q80t-root-handover.md).
+The owner successfully ran the updated
+`root-bridge.ps1 -Action PrepareStaged` /
+`root-bridge.ps1 -Action ListenStaged` checksum-gated workflow on the
+actual Q80T. The listener printed `STAGE-HASH-VERIFIED`, then
+`SNAPSHOT-RECEIVED`, the assessor reported the expected firmware and
+Home/runtime evidence, and the wrapper logged that **temporary lab access
+was revoked and host/XRDP credentials restored**. The TV-saved Remote PC
+password still needs confirming/updating to the ordinary lab credential.
 
-### Experimental staged transport — not ready for use
+The raw report is **private and only on the owner's PC** under
+ignored `.local/tiz0wn-lab/`. Do not commit or share the raw report,
+session token, password, private network addresses or device identifiers.
+The snapshot does **not** prove Home control, persistent root or a
+recoverable firmware modification.
 
-**Do not run `staged-snapshot.ps1 -Action Prepare` yet.** The new
-`staged-snapshot.py` and `staged-snapshot.ps1` helpers are an untested
-prototype; their current short-credential construction is inconsistent,
-and no Windows or Samsung hardware tests have been completed.
-Neither helper was run against the owner's TV. No claim of successful SDB
-staging, collection or XRDP restoration is made.
+See the [verified milestone](../../docs/q80t-nov21-snapshot-success.md),
+[current handover](../../docs/q80t-root-handover.md), and
+[historical pre-success troubleshooting](../../docs/q80t-nov21-offline-status.md).
 
-The concept is to stage a fixed, read-only survey via SDB, verify its
-bytes with a read-back, perform one owner-operated Remote PC/Shared
-Folder action, retrieve a private report, and restore dedicated lab
-credentials. This design may still be blocked by firmware-specific SDB
-upload permissions or security labels. Correct and test the
-implementation in an authorised development environment before enabling
-any privileged trial. `root-bridge.ps1 -Action Doctor` remains the
-existing safe host-only preflight.
+### Separate staged-snapshot prototype — do not use
 
-### Preferred next Q80T trial — checksum-gated staged snapshot (experimental)
+**Do not run `staged-snapshot.ps1 -Action Prepare`.** The separate
+`staged-snapshot.py` / `staged-snapshot.ps1` prototype uses a different,
+unvalidated workflow. Its credential construction has not been reconciled
+with the **hardware-tested** `root-bridge.ps1` method. Do not confuse
+the two entrypoints.
 
-**Owner-operated Q80T trial, not yet verified on this exact TV.**
-SDB `push` accepted the first survey on 21 November but this retail firmware
-rejected `sdb pull` with `You cannot pull files from this path`.
-The procedure below now **does not call SDB pull**.
+### Verified Q80T method — checksum-gated staged read-only snapshot
+
+**One successful full hardware trial on 21 November 2026.** SDB `push`
+was accepted but the earlier SDB `pull` failed with
+`You cannot pull files from this path`. The working method **never
+calls SDB pull**. The remaining instructions describe how that
+single successful owner-operated session was performed and how to
+restore it; they are not a request to repeat the trial now.
 
 The host stages two unique files using SDB: a small, fixed loader and the
 read-only survey body. The owner enters the short temporary Remote PC password
@@ -88,15 +89,16 @@ original locally generated survey digest and responds with the single word
 approval**, and the survey posts its bounded read-only report to the same
 receiver. The receiver accepts no downloadable executable in staged mode.
 
-This is **one TV interaction**, not a separate checksum login. The loader
-itself is trusted on the basis of a successful SDB upload on the owner's
-isolated network; it is not cryptographically attested and TV-specific UEP or
-SMACK rules may still prevent running it. No firmware, Home mapping, boot
-hook, system settings or installed application is modified.
+The successful trial required **one TV Remote PC connection and one Shared
+Folder action**, not a separate checksum login. The loader itself has only
+an SDB upload acknowledgement and is not cryptographically attested.
+A successful survey on this firmware does not establish a reusable root
+channel or future session repeatability. No firmware, Home mapping, boot
+hook, system settings or installed application was modified.
 
-Before trying it, run the updated offline checks, including the Linux shell
-tests. An offline pass establishes source correctness on the test host, not
-a guaranteed TV result.
+For a future *deliberately approved* repeat, start with the offline checks,
+including the Linux shell tests. These passed on 21 November; offline
+checks alone never guarantee TV success.
 
 From **Administrator PowerShell**, with Docker Desktop running:
 
@@ -127,9 +129,10 @@ PowerShell session:
 
 While the listener is running, use the displayed short password on the
 TV's existing Remote PC profile and open **Shared Folder once**.
-The receiver should print `STAGE-HASH-VERIFIED` before
-`SNAPSHOT-RECEIVED` and the privacy-preserving assessment. Collection ends
-by restoring the original lab credentials.
+On 21 November the receiver printed `STAGE-HASH-VERIFIED` before
+`SNAPSHOT-RECEIVED`, followed by the privacy-preserving assessment.
+Collection ended by restoring the original Windows/XRDP lab credentials.
+A fresh run must be checked independently before claiming repeatability.
 
 If collection fails or times out, the script still invokes Restore.
 If a session is interrupted, run:
@@ -144,13 +147,12 @@ temporary password or change Home. Report only its public status lines and
 verify credentials have returned to normal. Do not paste private reports,
 tokens, the TV password, signing settings or raw logs into chat.
 
-**Fallback / limits:** the TV must be able to read the SDB upload through
-the privileged Remote PC context and have `sha256sum`, `cut`, `curl`,
-`base64` and `/bin/sh` available. If any of those fail, no survey is
-approved, the receiver times out and restores credentials. That is a
-measured compatibility blocker, not an instruction to disable Samsung's
-security features. Files may remain in the SDK temporary directory.
-Never infer successful Home/boot control from a read-only survey.
+**Fallback / limits:** the TV did complete the surveyed execution on this
+occasion. Later firmware/security-label changes may block the same flow.
+The loader requires `sha256sum`, `cut`, `curl`, `base64` and `/bin/sh`.
+Failed verification must stop without triggering another Shared Folder
+attempt. Uploaded staging files may remain in the SDK temporary directory.
+Never infer Home/boot control from the read-only result.
 
 ### Reference procedure: bounded snapshot trial (currently blocked)
 
@@ -270,9 +272,11 @@ text, with no Enter key or navigation, and does **not** run a snapshot.
 It cannot prove that Samsung's password input accepted external text; inspect
 the masked field on the TV before connecting. Never paste credentials into
 chat. The host receiver exits on result/timeout; Ctrl+C stops it early.
-Repeatability, the TV credential restoration and physical Shared Folder
-flow still require owner observation. Do not proceed to Home writes until
-the actual Q80T report and independent recovery path are verified.
+The TV Shared Folder action was **observed working once** with the
+checksum-gated method; repeatability and saved-TV-credential restoration
+still require owner verification. The actual private Q80T report exists,
+but an off-TV Home DB backup and independent recovery route do not.
+Do not proceed to Home writes until those are verified.
 
 ### Remaining acceptance gates
 
@@ -327,6 +331,7 @@ television automatically. See `docs/q80t-privacy-and-cleanup.md`.
 | Standalone DansTV widget | Installed/tested by owner independently of this integration | `scripts/q80t-windows.ps1` |
 | Windows device/version/identity preflight | **Implemented, read-only** | `preflight.ps1` |
 | CPU load, RAM, process and app inventory | **Implemented as a root-side read-only script** | `snapshot.sh` |
+| Checksum-gated Q80T read-only root snapshot | **One successful hardware session, 21 Nov; not persistence** | `root-bridge.ps1`, `root-bridge.py`, `assess-snapshot.py` |
 | Tizen 5.5 Home-key database routing | **Implemented as an unexecuted root-side trial** | `home-ctx.sh` |
 | Exact-value Home restoration | **Implemented with a saved baseline; untested on Q80T** | `home-ctx.sh restore` |
 | Debloat package lifecycle | **Use upstream's audited `pkgstate`, not an ad-hoc package remover** | tiz0wn `exploits/tiz0wn-root/payload/pkgstate` |
