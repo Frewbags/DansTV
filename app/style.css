@@ -633,3 +633,48 @@ html,body{width:100%;height:100%;overflow:hidden;background:#000}
 .l-list .quiet-utils.is-text .u-content>*+*{margin-left:0;margin-right:0}
 .quiet-utils.is-text .u-content>*+*{margin-left:0}
 .l-list .quiet-utils.is-text .u .u-content>*+*{margin-right:0}
+
+/* ---------- Accent: an optional tint on the solid focus highlight ----------
+   Applies to the "solid" plate used by menus, settings rows and command buttons.
+   Placed after the Background rules so the accent wins the shared --solid tokens.
+   Neutral keeps the Background-derived highlight; Home glass is left untouched. */
+.ac-blue{--solid:#3b6ff5;--solid-ink:#f6f9ff;--solid-mute:rgba(246,249,255,.74);--solid-warn:#ffd9a8}
+.ac-violet{--solid:#7a5af5;--solid-ink:#f8f6ff;--solid-mute:rgba(248,246,255,.74);--solid-warn:#ffd9a8}
+.ac-emerald{--solid:#10976a;--solid-ink:#f2fff9;--solid-mute:rgba(242,255,249,.76);--solid-warn:#ffd9a8}
+.accent-swatch{width:56px;height:56px;margin-right:0;border-radius:28px;box-shadow:inset 0 0 0 2px rgba(255,255,255,.22)}
+.accent-swatch-neutral{background:rgba(127,127,127,.18);box-shadow:inset 0 0 0 3px var(--faint)}
+.accent-swatch-blue{background:#3b6ff5}
+.accent-swatch-violet{background:#7a5af5}
+.accent-swatch-emerald{background:#10976a}
+.section-accent .setting-choice{justify-content:center;min-height:92px;padding:12px 8px}
+.section-accent .setting-choice.is-applied .accent-swatch{box-shadow:inset 0 0 0 2px rgba(255,255,255,.3),0 0 0 3px var(--ink)}
+/* Glass focus inside panels (All apps, Home editor) picks up the accent too.
+   Scoped to the sheet and to Glass focus, so Type focus and the tuned Home
+   glass over the photo are left as they are. */
+.f-glass.ac-blue .sheet{--plate:rgba(59,111,245,.30);--lift:rgba(59,111,245,.44)}
+.f-glass.ac-violet .sheet{--plate:rgba(122,90,245,.30);--lift:rgba(122,90,245,.44)}
+.f-glass.ac-emerald .sheet{--plate:rgba(16,151,106,.32);--lift:rgba(16,151,106,.46)}
+
+/* ---------- DansTV brand: a brief, non-blocking launch wordmark ----------
+   Covers the stage with the committed ground colour, then fades to Home.
+   It plays once per session, never traps focus (pointer-events:none) and
+   respects reduced motion. The accent tints the "TV" and the rule. */
+.brand{position:absolute;left:0;top:0;width:1920px;height:1080px;z-index:9;display:flex;align-items:center;justify-content:center;background:var(--ground);opacity:0;visibility:hidden;pointer-events:none}
+.brand.is-gone{display:none}
+.brand-lockup{display:flex;flex-direction:column;align-items:center}
+.brand-word{font-family:Manrope,Arial,sans-serif;font-size:150px;line-height:1;font-weight:700;letter-spacing:-6px;color:var(--ink);white-space:nowrap;text-shadow:0 2px 24px rgba(0,0,0,.28)}
+.brand-tv{color:var(--ink);opacity:.5}
+.brand-rule{margin-top:36px;width:216px;height:6px;border-radius:3px;background:var(--solid);transform-origin:50% 50%}
+.ac-blue .brand-tv{color:#3b6ff5;opacity:1}
+.ac-violet .brand-tv{color:#7a5af5;opacity:1}
+.ac-emerald .brand-tv{color:#10976a;opacity:1}
+.brand.is-playing{visibility:visible;animation:brand-cover 1500ms var(--ease) forwards}
+.brand.is-playing .brand-word{animation:brand-rise 560ms var(--ease) both}
+.brand.is-playing .brand-rule{animation:brand-draw 640ms var(--ease) 140ms both}
+@keyframes brand-cover{0%{opacity:1}66%{opacity:1}100%{opacity:0}}
+@keyframes brand-rise{from{opacity:0;transform:translateY(16px)}to{opacity:1;transform:translateY(0)}}
+@keyframes brand-draw{from{opacity:0;transform:scaleX(.2)}to{opacity:1;transform:scaleX(1)}}
+@media(prefers-reduced-motion:reduce){
+  .brand.is-playing{animation:brand-cover 760ms linear forwards}
+  .brand.is-playing .brand-word,.brand.is-playing .brand-rule{animation:none;opacity:1;transform:none}
+}
