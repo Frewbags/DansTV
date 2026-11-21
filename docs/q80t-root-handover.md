@@ -1,46 +1,142 @@
 # Q80T root integration handover
 
-Originally 16 November 2026; revised 21 November 2026. Branch: `feature/q80t-windows-setup`; draft PR #1.
+Updated **21 November 2026**, after the successful read-only TV trial.
+Branch: `feature/q80t-windows-setup`; draft PR #1.
+Target: **QA65Q80TAWXXY**, **T-NKMUABC-2743.0**, Tizen 5.5 / ARMv7.
 
-> **21 November hardware follow-up:** The read-only snapshot remains uncollected. Normal RDP/Shared Folder and restoration were verified; a 128-character alphanumeric credential and short punctuation credentials authenticated on the Q80T. A combined long/mixed-character test failed even though its Linux hash matched. The entry-transport cause is not yet established. The standalone Docker readiness checker passed locally; the new staged flow now has its own bounded XRDP/TCP readiness check, including during restoration. See [offline status and next-session checklist](q80t-nov21-offline-status.md) for the current evidence. Do not repeat old snapshot instructions blindly.
+**Resume from the saved snapshot, not from root acquisition.**
+See [verified hardware milestone](q80t-nov21-snapshot-success.md),
+[operating procedure](../scripts/tiz0wn/README.md) and
+[completion checklist](q80t-finish-checklist.md).
 
-The [Curtisg890 Tizen 5.5 integration architecture assessment](q80t-vetro-tizen55-architecture.md) separates root acquisition, the authenticated broker, the web widget, Home routing, and boot persistence. **Nothing in the fork provides Q80T-verified boot persistence or a Q80T Home launcher.** The snapshot and assessor now include conservative read-only service-prerequisite signals, but no new TV evidence has been collected.
+## What actually worked
 
-## Confirmed versus pending
+On 21 November, the owner completed a single checksum-gated
+SDB-stage → Samsung Remote PC → Shared Folder → local HTTP report trial:
 
-- Owner confirmed Remote PC/CIFS effective UID 0 on QA65Q80TAWXXY / T-NKMUABC-2743.0. Preserve this milestone; do not retry the unavailable dotnet route.
-- Current branch was pulled with fast-forward only; remote remained at `ce7f372` before this increment.
-- Disposable Docker XRDP lab was observed running. No `lab.env.before-uid` backup remains. This is consistent with earlier restore, but Windows account/firewall state was not verified: the current agent process is not Administrator.
-- Agent Bus connection was refused; no board claim was delivered. Its current sender accepts the token through `AGENT_BUS_TOKEN`, not the documented `-Token` switch.
-- Snapshot transport now has Windows Prepare/Listen/Restore, fresh session tokens, fixed read-only inventory, combined stdout/stderr, EUID/exit framing, bounded HTTP, exclusive report creation, and normal temporary-file cleanup. The password helper accepts an exact active snapshot session as well as the original UID trial.
-- No command in this increment contacted the television. No Home, package, startup or firmware changes were performed. Snapshot transport and credential restoration remain **hardware-unverified**.
+- Windows: `npm run check:home` passed (Home/static checks, 9 cleanup
+  tests, 15 transport cases with 3 Linux-only skips, 7 assessment tests).
+  The PowerShell source parser check also passed after fixing a malformed
+  `ListenStaged` block. Disposable Linux ran **15/15** transport tests.
+- Host Doctor passed exact Q80T model/firmware and owned lab prerequisites.
+- `root-bridge.ps1 -Action PrepareStaged` reported `STAGED-READY`.
+  This uploaded **two** fresh staging files through SDB and rotated only
+  the dedicated disposable Windows/XRDP credentials.
+- `root-bridge.ps1 -Action ListenStaged` entered
+  `Snapshot receiver ready`. The owner connected from Samsung Remote PC
+  and opened **Shared Folder once**.
+- Listener reported `STAGE-HASH-VERIFIED` then `SNAPSHOT-RECEIVED`.
+  The assessor reported the exact firmware marker matched and read-only
+  Home preference, `XF86Home` and service-prerequisite observations.
+- On exit, the dedicated XRDP lab was restarted, the temporary listener
+  permission revoked and the **original host/XRDP credentials restored**.
+  The owner's TV-saved Remote PC password needs to match the normal
+  credential again; that step was not separately confirmed.
 
-## Validation
+The private snapshot is saved under ignored
+`.local/tiz0wn-lab/snapshot-*.txt` on the owner's PC. It was **not**
+uploaded to GitHub. Its token-bearing filename and full contents may
+reveal private device/network identifiers: never paste or commit them.
 
-The standard tool suite needs Unix `termios`; `npm run check:tools` cannot run directly on this Windows Python installation. A disposable Linux container with a read-only repository mount, Git and curl passed all 15 tool tests, the existing Home SQL safeguards and all 8 transport tests. The latter include a real Bash command-substitution → curl download → source → report POST round trip against local Linux, including removal of the downloaded script. This is host evidence, not TV compatibility evidence.
+**Meaning:** one successful full read-only diagnostic, with report framing
+and an on-TV survey-body checksum. This is stronger than the earlier
+16 November one-shot UID-0 proof, but **not** cryptographic device
+attestation, an authenticated persistent broker, a reusable root shell,
+Home control, boot persistence or proven independent recovery.
+No TV system configuration, Home mapping, firmware or packages changed.
 
-PowerShell scripts parse successfully. Python diagnostics for the receiver are clean; Serena cannot resolve the optional `websocket` dependency, although the active Windows Python interpreter can locate the installed module. No app source changed.
+## Why the working method is different
 
-## Resume here — staged short-password trial (21 November update)
+The first staged trial failed at SDB `pull`:
+`You cannot pull files from this path`. Despite
+`filesync_support:pushpull`, this TV does not permit pulling that staging
+path; SDB root and interactive shell are disabled.
 
-**Do not run the obsolete `Prepare`/long-password snapshot sequence.** A new
-`PrepareStaged`/ `ListenStaged` flow has been committed but **not tested on
-the TV or the owner's Windows machine yet**. It is distinct from the older
-failed long-credential experiment and has an SDB upload/readback + SHA-256
-gate before rotating credentials. The exact staged file is base64-encoded
-as shell content, avoiding UEP script-path execution; the Remote PC password
-only references the staged text, without literal space, `<`, `|` or `&`.
-A bounded HTTP callback remains for report receipt, not code download.
+The successful path **does not use SDB pull**. It stages a tiny loader and
+the separately generated fixed survey using SDB `push` acknowledgments.
+When the owner triggers the previously demonstrated Remote PC/Shared Folder
+execution context, the loader computes the TV-side survey SHA-256 and
+POSTs only its checksum. The bounded receiver compares it with the host
+copy, approves a matching one-use session, then accepts a framed
+read-only result. Report collection and credential restoration are
+automatic on normal listener completion.
 
-1. On the Windows PC with TV access: `git pull --ff-only origin feature/q80t-windows-setup`, then `npm run check:home`. If either fails, **stop**. From Administrator PowerShell run `.\\scripts\\tiz0wn\\root-bridge.ps1 -Action PrepareStaged`. It performs the Doctor preflight, SDB push/pull hash verification and XRDP readiness checks before reporting `STAGED-READY`. If SDB pull is denied, it stops *without* credential rotation.
-2. Only after `STAGED-READY`, run `.\\scripts\\tiz0wn\\root-bridge.ps1 -Action ListenStaged` in the same elevated shell. On TV, connect to Remote PC with the printed temporary short password and open **Shared Folder** once. Receiver either validates a report or times out, then automatically restores lab credentials; check Doctor afterwards. Give the owner one action at a time and do not ask them to paste the lab password into chat. If interrupted before Listen, run `-Action Restore` and `-Action Doctor`.
-3. Inspect the private report and receipt. Confirm UID, build, Home schema, native values, services and partition metadata individually; a successful report does not prove every optional query worked. Verify listener stop, firewall removal and dedicated credential restoration. Repeat with a fresh token to establish repeatability.
-4. Extend the bounded operation allowlist only after the first complete TV trial. Capture a consistent Home DB backup and typed values, transfer and hash-verify off-TV copies, and prove restore transport before Home apply. The current snapshot does not export the full DB.
-5. Validate reversible Home routing, physical navigation and rollback before any debloat. Measure actual services rather than importing a generic list.
-6. Persistent boot work remains gated on the exact official NKMUABC image, live-build match, independently derived offsets and original block backups plus credible recovery. No foreign-model offsets.
+The loader itself is not independently attested; receipt/marker checks are
+not cryptographic identity checks. Keep the receiver confined to the
+trusted LAN. `root-bridge.ps1` is the **hardware-tested pathway**.
+The separate `staged-snapshot.ps1` and its Python companion are
+unfinished prototypes and **must not** be substituted.
 
-Full commands, trial limits and restore procedure: `scripts/tiz0wn/README.md`.
+## Read-only evidence from the assessor
 
-## Upstream review
+- Exact firmware marker matched.
+- `db/appfw/home_appid`, `db/appfw/startup_appid`,
+  `db/appfw/booting_appid_backup`, `db/first_screen/type`,
+  `db/menu/smart_hub/ontvsetting/auto_start`: **reported**.
+- `XF86Home` context: **observed**.
+- Node in shell PATH, dotnet launcher, app-data directory, survey shell
+  SMACK label: **observed**.
+- **Still unmeasured:** native Home main-operation handler, Tizen
+  web-service Node runtime, authenticated root broker.
+- **Home/startup write authorisation: NO.**
 
-Reviewed the current tiz0wn issue #1 discussion and Q70T, USB-root and Vetro README references. Q90T testimony distinguishes Remote PC proof from its later USB/persistence work and warns about UEP, unsigned script execution and limited no-boot recovery. Vetro's current compatibility table does not support root features on stock Tizen 5.5. These are method references, never firmware compatibility proof for this Australian Q80T. No new upstream code was copied in this increment; retain existing notices.
+The assessor deliberately suppresses original values. Presence of a
+section does not prove the value, a valid app mapping, service runtime,
+SMACK permissions or compatibility with a borrowed Home method.
+Inspect the full report **locally and privately**.
+
+## Where to resume (no TV session required)
+
+1. **Preserve** the existing snapshot, receipt metadata and local lab
+   configuration. Confirm the original host credentials and firewall are
+   restored; `root-bridge.ps1 -Action Doctor` should pass in
+   Administrator PowerShell with Docker Desktop running.
+2. **Review the actual saved report privately.** Record each Home
+   preference and `XF86Home` table/schema observation with explicit
+   query-success/missing-value status. Review service, mount, security-label
+   and partition evidence; do not infer a root-owned broker from Node's
+   presence.
+3. **Plan an off-TV verified backup** of the original Home database and
+   typed preference values, plus an independent restoration mechanism.
+   The current read-only snapshot is **not** that database backup.
+4. **Identify the Q80T-native Home main-operation handler** and what
+   happens with Back, Live TV, HDMI, standby and app return. Do not use
+   a 2022 Tizen 6.5 or different-model `home-ctx.sh` mapping on assumption.
+5. Only after backup/recovery are proved, separately consider a
+   reversible, model-specific Home routing experiment. Boot and
+   debloat changes remain separate gates.
+
+**No further root trial is needed just to begin analysis.** A second,
+fresh-session read-only run may be useful later to establish
+repeatability, but this is not a current prerequisite to reviewing
+the evidence already captured.
+
+## Later repeat (if justified; not an automatic next action)
+
+Use the [reviewed operating procedure](../scripts/tiz0wn/README.md):
+verify tests/Doctor, `-Action PrepareStaged`, start
+`-Action ListenStaged`, then a **single** owner-operated Remote PC
+login and **single** Shared Folder activation. A successful receiver
+prints `STAGE-HASH-VERIFIED` followed by `SNAPSHOT-RECEIVED`,
+assesses locally and calls Restore. If the listener fails or is
+interrupted, inspect recovery state and invoke
+`root-bridge.ps1 -Action Restore` as needed, then Doctor.
+
+Do **not** use the older `-Action Prepare` long-password flow,
+the failed SDB-pull gate, or the untested separate
+`staged-snapshot.ps1 -Action Prepare`.
+
+## Upstream architecture / remaining restrictions
+
+The [Curtisg890/Vetro Tizen 5.5 assessment](q80t-vetro-tizen55-architecture.md)
+separates root acquisition, authenticated broker, widget, Home routing
+and boot persistence. The fork's TU7000/KTSU firmware is not this
+Q80T/NKMUABC build, and its public code does not supply this TV's
+native Home mapping, an installed root broker or safe boot hook.
+
+No changes to firmware, installed packages, Home/startup, service
+disablement or raw partitions have been authorised or executed.
+**Cold-boot persistence and firmware writes remain blocked** until an
+exact matching official image, verified original-block backups and
+a credible independent recovery path exist. Never transfer
+foreign-model offsets.
