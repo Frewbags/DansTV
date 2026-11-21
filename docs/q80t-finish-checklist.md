@@ -14,7 +14,7 @@ T-NKMUABC-2743.0. Owner branch: `feature/q80t-windows-setup`, draft PR #1.
 | Cross-platform `npm run check`, Windows CI, snapshot assessor | Added subsequently; rerun/CI evidence pending |
 | Volume / mute | Web API adapter has mock coverage; physical Q80T validation pending |
 | HDMI, applications, Back and Samsung Settings | Automated mock coverage; full current-build hardware regression pending |
-| Read-only root snapshot transport | Attempted with long mixed-character credential; **no validated report received** |
+| Read-only root snapshot transport | Long-password method failed; **short SDB-staged method committed but not hardware-tested; no validated report received** |
 | Tizen 5.5 integration prerequisites | Read-only inventory and conservative assessor checks added; **no Q80T runtime or broker evidence yet** |
 | Vetro fork integration | Reviewed Curtisg890 `tizen55-tiz0wn-backend`; **reference design only**, not imported or installed |
 | Elevated access | One bounded UID-0 callback observed, not an enduring root shell |
@@ -58,14 +58,16 @@ See [architecture review](q80t-vetro-tizen55-architecture.md) and [current hardw
    Doctor checks the exact saved model/firmware and local disposable lab
    prerequisites. It makes no TV change. Do not continue if a guard fails.
 
-4. **With the owner present at the TV**, use the documented bounded snapshot
-   procedure in `scripts/tiz0wn/README.md`. `Prepare` rotates only the
-   dedicated Windows lab credentials, restarts its disposable XRDP container
-   and opens a temporary firewall rule; `Listen` accepts one survey, then
-   restores those changes. If interrupted after Prepare, explicitly use
-   `root-bridge.ps1 -Action Restore`. Confirm the TV's saved Remote PC
-   password is reset to the ordinary lab password. This is not a persistent
-   root installation, nor is it risk-free.
+4. **With the owner at the TV**, use the newer, explicitly experimental
+   **`PrepareStaged` / `ListenStaged`** procedure in
+   `scripts/tiz0wn/README.md`. `PrepareStaged` refuses to rotate the lab
+   account until SDB upload and readback SHA-256 verify, then validates XRDP's
+   TCP listener. `ListenStaged` accepts one report and automatically calls
+   Restore; Home and firmware stay untouched. If SDB pull is denied,
+   **stop**, with no credential change. If interrupted after preparing, use
+   `root-bridge.ps1 -Action Restore`, then Doctor. Confirm TV Remote PC
+   saved credentials return to the ordinary lab password. The older
+   `Prepare`/long-password sequence is not the current recommendation.
 
 5. **Keep raw reports private** under `.local/tiz0wn-lab/`. To produce a
    shareable evidence summary without raw IDs/IPs, run:
