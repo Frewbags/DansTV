@@ -1,6 +1,6 @@
 # DansTV Q80T completion gates
 
-Updated **21 November 2026** after a successful read-only root snapshot.
+Updated **21 November 2026** after two successful read-only root snapshots and the evening Home-backup preparation.
 Target only: **QA65Q80TAWXXY**, Tizen 5.5, **T-NKMUABC-2743.0**.
 Owner branch: `feature/q80t-windows-setup`, draft PR #1.
 
@@ -8,20 +8,20 @@ Owner branch: `feature/q80t-windows-setup`, draft PR #1.
 
 | Item | Status |
 | --- | --- |
-| Standalone DansTV WGT | Previously installed/launched by owner; latest physical regression pending |
+| Standalone DansTV WGT | Manually works on Q80T; Home still launches Samsung Smart Hub. Installed ID observed: `iN5p1j5y6b.DansTV` (not tracked source manifest ID) |
 | UI/device simulations | 18/18 launcher/device tests on Windows (20 Nov); latest physical checks pending |
 | Home/static and cleanup guards | Passed on Windows 21 Nov; 9/9 cleanup tests |
 | Bounded snapshot transport simulations | Windows 15 cases passed (3 Linux-only skipped); **Linux 15/15 passed** |
 | Read-only report assessor | **7/7 passed**; hides raw private values |
 | Windows PowerShell parser | Passed following 21 Nov syntax fix; included in `check:home` |
-| Root diagnostic on Q80T | **SUCCESS, 21 Nov: TV checksum verified, complete framed snapshot received** |
+| Root diagnostic on Q80T | **TWO successes, 21 Nov:** TV checksum verified and complete read-only snapshot received twice |
 | XRDP/Windows credentials | Listener logged **access revoked and original lab credentials restored**; TV-saved password still to verify |
-| Home preferences and `XF86Home` | Report sections/indicators present; original values require **private review** |
+| Home preferences and `XF86Home` | Original Samsung `XF86Home` row observed: `com.samsung.tv.csfs` → `package:com.samsung.tv.csfs`, `entry_point:smarthub_key`; native operation still unmeasured |
 | Node PATH / dotnet / app-data / shell SMACK label | Observed in read-only snapshot; **service/runtime compatibility unproven** |
 | Native Home main-operation | **Not measured** |
 | Privileged service / authenticated broker | **Not provisioned or verified** |
-| Independently verified off-TV Home DB backup / recovery | **Not done** |
-| Home replacement and cold-boot persistence | **Not achieved** |
+| Off-TV Home DB backup / recovery | Export and offline verifier implemented; **actual backup not yet collected or hardware-verified**; independent recovery not established |
+| Home replacement and cold-boot persistence | **Not achieved**; `home-ctx.sh` write path remains untested and not authorised |
 | Debloat, Home writes, firmware/boot changes | **None applied** |
 
 The [verified milestone record](q80t-nov21-snapshot-success.md) preserves
@@ -49,6 +49,26 @@ safe failure and restoration instructions. The older long-password
 `staged-snapshot.ps1 -Action Prepare` are **not** replacements.
 One successful trial does not prove repeatability or establish
 cryptographic attestation.
+
+## Pending evening cleanup and next action
+
+The owner prepared a **third staged diagnostic** on 21 November and saw
+`STAGED-READY`, but deferred the TV trigger until the next day. The
+temporary lab credentials/firewall must be restored before leaving the
+PC: `root-bridge.ps1 -Action Restore`. **Restore completion is
+not yet confirmed in this handover.** This cancels the prepared
+session; tomorrow requires a **fresh** `PrepareStaged`.
+
+The intended next diagnostic is a private, read-only **SQLite Home DB
+backup** and local extraction/verification, not a Home-button write.
+See [Home DB backup instructions](q80t-home-backup.md) and
+[evening handover](q80t-root-handover.md). Current full
+`npm run check:home` passed on Windows, including 7/7 new
+backup-verifier tests. The feature itself is still unverified on TV.
+
+Claude's Blue/Emerald UI experiment was merged to the current GitHub
+feature branch, retaining the neutral default, according to the
+owner's merge/push completion and the GitHub UI-file diff.
 
 ## Resume work — no TV operation needed
 
